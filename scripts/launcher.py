@@ -174,22 +174,46 @@ def cleanup_invalid_packages():
             pass
 
 
-def start_backend(host="127.0.0.1"):
-    print(f"Starting backend (port 8000, host={host})...")
-    cmd = [PYTHON, "-m", "uvicorn", "app.main:app", "--reload", f"--host={host}", "--port=8000", "--log-level=info"]
-    proc = subprocess.Popen(cmd, cwd=str(BACKEND_DIR), creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0)
-    time.sleep(3)
-    return proc.pid
+def start_backend(host="127.0.0.1", background=True):
+    """启动后端服务"""
+    print(f"Starting backend (port 8000)...")
+    cmd = [PYTHON, "-m", "uvicorn", "app.main:app", "--reload", f"--host={host}", "--port=8000", "--log-level=warning"]
+    
+    if background:
+        # 后台启动，不等待
+        proc = subprocess.Popen(
+            cmd,
+            cwd=str(BACKEND_DIR),
+            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+        time.sleep(2)  # 短暂等待以确保启动
+        return proc.pid
+    else:
+        # 前台启动（用于调试）
+        return subprocess.run(cmd, cwd=str(BACKEND_DIR)).returncode
 
 
-def start_frontend(host=None):
+def start_frontend(background=True):
+    """启动前端服务"""
     print("Starting frontend (port 5173)...")
     cmd = ["npm", "run", "dev"]
-    if host:
-        cmd.extend(["--", "--host", "0.0.0.0"])
-    proc = subprocess.Popen(cmd, cwd=str(FRONTEND_DIR), creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0)
-    time.sleep(4)
-    return proc.pid
+    
+    if background:
+        # 后台启动
+        proc = subprocess.Popen(
+            cmd,
+            cwd=str(FRONTEND_DIR),
+            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+        time.sleep(3)  # 短暂等待以确保启动
+        return proc.pid
+    else:
+        # 前台启动
+        return subprocess.run(cmd, cwd=str(FRONTEND_DIR)).returncode
 
 
 def get_local_ip():
