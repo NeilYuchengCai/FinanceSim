@@ -1,137 +1,93 @@
 import { useState } from 'react'
-import axios from 'axios'
 
 interface SearchResult {
   type: string
-  ticker?: string
-  name?: string
-  sector?: string
-  id?: string
-  title?: string
-  headline?: string
-  importance?: string
+  title: string
+  score: number
 }
 
 export default function Search() {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
-  const [loading, setLoading] = useState(false)
-  const [searched, setSearched] = useState(false)
+  const [searching, setSearching] = useState(false)
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!query.trim()) return
-    
-    setLoading(true)
-    setSearched(true)
+  const handleSearch = async (q: string) => {
+    if (q.length < 2) {
+      setResults([])
+      return
+    }
+    setSearching(true)
     try {
-      const res = await axios.get(`/api/search?q=${encodeURIComponent(query)}`)
-      setResults([
-        ...res.data.assets.map((a: any) => ({ ...a, type: 'asset' })),
-        ...res.data.events.map((e: any) => ({ ...e, type: 'event' })),
-        ...res.data.news.map((n: any) => ({ ...n, type: 'news' }))
-      ])
-    } catch (err) {
+      const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`)
+      const data = await res.json()
+      setResults(data || [])
+    } catch {
       setResults([])
     } finally {
-      setLoading(false)
-    }
-  }
-
-  const getIcon = (type: string) => {
-    switch(type) {
-      case 'asset': return '📈'
-      case 'event': return '📰'
-      case 'news': return '📋'
-      default: return '🔍'
-    }
-  }
-
-  const getTypeColor = (type: string) => {
-    switch(type) {
-      case 'asset': return 'tag-blue'
-      case 'event': return 'tag-orange'
-      case 'news': return 'tag-purple'
-      default: return 'tag-gray'
+      setSearching(false)
     }
   }
 
   return (
     <div>
       <div className="page-header">
-        <h2>Search</h2>
-        <p className="subtitle">Global search across markets</p>
+        <h2>全局搜索</h2>
+        <p className="subtitle">搜索资产、新闻、事件</p>
       </div>
 
-      <div className="card">
-        <div className="card-header">
-          <span className="card-title">Search</span>
-        </div>
-        <form onSubmit={handleSearch} style={{ display: 'flex', gap: 12 }}>
+      <div className="card" style={{ marginBottom: 20 }}>
+        <div style={{ position: 'relative' }}>
           <input
             type="text"
             className="input-field"
-            placeholder="Search by ticker, company, event..."
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            style={{ flex: 1 }}
+            onChange={(e) => { setQuery(e.target.value); handleSearch(e.target.value) }}
+            placeholder="输入关键词搜索..."
+            style={{ width: '100%', paddingRight: 100 }}
           />
-          <button type="submit" className="btn btn-primary" disabled={loading}>
-            {loading ? 'Searching...' : 'Search'}
-          </button>
-        </form>
-
-        {searched && (
-          <div style={{ marginTop: 20 }}>
-            {results.length > 0 ? (
-              <>
-                <div style={{ marginBottom: 12, color: 'var(--text-secondary)' }}>
-                  Found {results.length} results
-                </div>
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Type</th>
-                      <th>Name/Headline</th>
-                      <th>Details</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {results.map((item, i) => (
-                      <tr key={i}>
-                        <td>
-                          <span className={`tag ${getTypeColor(item.type)}`}>
-                            {getIcon(item.type)} {item.type.toUpperCase()}
-                          </span>
-                        </td>
-                        <td>
-                          {item.type === 'asset' && <strong>{item.ticker}</strong>}
-                          {item.type === 'event' && <strong>{item.title}</strong>}
-                          {item.type === 'news' && <strong>{item.headline}</strong>}
-                        </td>
-                        <td style={{ color: 'var(--text-secondary)' }}>
-                          {item.type === 'asset' && item.sector}
-                          {item.type === 'news' && item.importance}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </>
-            ) : (
-              <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-secondary)' }}>
-                No results found
-              </div>
-            )}
-          </div>
-        )}
-
-        {!searched && (
-          <div style={{ marginTop: 20, color: 'var(--text-secondary)', textAlign: 'center', padding: 20 }}>
-            Enter a search term to find assets, events, or news...
-          </div>
-        )}
+          <span className="kbd" style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)' }}>⌘K</span>
+        </div>
       </div>
+
+      {searching && (
+        <div className="card" style={{ textAlign: 'center', padding: 40 }}>
+          <div className="loading">加载中...</div>
+        </div>
+      )}
+
+      {!searching && results.length > 0 && (
+        <div className="card">
+          <div className="card-header">
+            <span className="card-title">搜索结果</span>
+            <span className="tag tag-blue">{results.length} 条结果</span>
+          </div>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>类型</th>
+                <th>标题</th>
+                <th>相关度</th>
+              </tr>
+            </thead>
+            <tbody>
+              {results.map((r: SearchResult, i: number) => (
+                <tr key={i}>
+                  <td><span className={`tag ${r.type === 'asset' ? 'tag-blue' : r.type === 'news' ? 'tag-purple' : 'tag-gray'}`}>{r.type}</span></td>
+                  <td>{r.title}</td>
+                  <td>{(r.score * 100).toFixed(0)}%</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {!searching && query.length >= 2 && results.length === 0 && (
+        <div className="card" style={{ textAlign: 'center', padding: 40 }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>🔍</div>
+          <p style={{ color: 'var(--text-secondary)' }}>未找到相关结果</p>
+        </div>
+      )}
     </div>
   )
 }

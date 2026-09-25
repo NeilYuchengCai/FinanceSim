@@ -4,6 +4,7 @@ import { useTheme } from './hooks/useTheme'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import CommandPalette from './components/CommandPalette'
 import { allLazyRoutes } from './routes'
+import { t } from './i18n'
 
 // Loading 组件
 const PageLoader = () => (
@@ -128,7 +129,7 @@ function App() {
               }}
             >
               <span className="kbd">⌘</span><span className="kbd">K</span>
-              <span style={{ marginLeft: 4 }}>Search...</span>
+              <span style={{ marginLeft: 4 }}>{t('common.search')}</span>
             </button>
           </div>
           <div style={{ padding: '0 20px 16px' }}>
@@ -149,7 +150,7 @@ function App() {
                 gap: '8px'
               }}
             >
-              {theme === 'dark' ? '☀️ Light Mode' : '🌙 Dark Mode'}
+              {theme === 'dark' ? '☀️ 浅色模式' : '🌙 深色模式'}
             </button>
           </div>
         </nav>

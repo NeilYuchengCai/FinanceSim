@@ -1,36 +1,39 @@
+import { t } from '../i18n'
+
 export default function Settings() {
   return (
     <div>
       <div className="page-header">
-        <h2>Settings</h2>
-        <p className="subtitle">Configure your simulation</p>
+        <h2>{t('settings.title')}</h2>
+        <p className="subtitle">{t('settings.subtitle', '配置模拟选项')}</p>
       </div>
       
       <div className="card">
         <div className="card-header">
-          <span className="card-title">General Settings</span>
+          <span className="card-title">{t('settings.general', '通用设置')}</span>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
-            <label>Theme</label>
+            <label>{t('settings.theme')}</label>
             <select className="input-field">
-              <option>Dark</option>
-              <option>Light</option>
+              <option value="dark">{t('settings.dark')}</option>
+              <option value="light">{t('settings.light')}</option>
             </select>
           </div>
           <div>
-            <label>Language</label>
+            <label>{t('settings.language')}</label>
             <select className="input-field">
-              <option>English</option>
-              <option>中文</option>
+              <option value="zh-CN">{t('settings.chinese')}</option>
+              <option value="en">English</option>
             </select>
           </div>
           <div>
-            <label>Currency Display</label>
+            <label>{t('settings.currencyDisplay', '货币显示')}</label>
             <select className="input-field">
               <option>USD ($)</option>
               <option>EUR (€)</option>
-              <option>GBP (£)</option>
+              <option>CNY (¥)</option>
+              <option>CHF (Fr)</option>
             </select>
           </div>
         </div>
@@ -38,11 +41,11 @@ export default function Settings() {
       
       <div className="card">
         <div className="card-header">
-          <span className="card-title">Simulation Settings</span>
+          <span className="card-title">{t('settings.simulation', '模拟设置')}</span>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
-            <label>Default Speed</label>
+            <label>{t('settings.defaultSpeed', '默认速度')}</label>
             <select className="input-field">
               <option>1x</option>
               <option>10x</option>
@@ -51,9 +54,9 @@ export default function Settings() {
             </select>
           </div>
           <div>
-            <label>Data Source</label>
+            <label>{t('settings.dataSource', '数据源')}</label>
             <select className="input-field">
-              <option>Fallback Dataset</option>
+              <option>{t('settings.fallback', '内置数据')}</option>
               <option>Alpha Vantage</option>
               <option>FRED</option>
               <option>Frankfurter</option>
