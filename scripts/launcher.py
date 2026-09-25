@@ -95,32 +95,67 @@ def kill_pids():
     subprocess.run(["taskkill", "/IM", "node.exe", "/F"], capture_output=True)
 
 
+def check_deps_installed():
+    """检查依赖是否已安装"""
+    try:
+        import fastapi
+        import uvicorn
+        import sqlalchemy
+        import aiosqlite
+        print("[OK] Backend dependencies already installed")
+        return True
+    except ImportError as e:
+        print(f"[WARN] Missing dependency: {e}")
+        return False
+
+
+def check_frontend_deps():
+    """检查前端依赖是否已安装"""
+    return (FRONTEND_DIR / "node_modules").exists()
+
+
 def install_deps():
+    """安装依赖（如果未安装）"""
+    # 先检查是否已安装
+    if check_deps_installed():
+        backend_ok = True
+    else:
+        backend_ok = False
+    
+    frontend_ok = check_frontend_deps()
+    
+    if backend_ok and frontend_ok:
+        print("[OK] All dependencies already installed")
+        return
+    
     print("Installing dependencies...")
-    # Use the full Python path for pip to avoid virtualenv issues
-    pip_path = Path(PYTHON).parent / "pip.exe" if sys.platform == "win32" else Path(PYTHON).parent / "bin" / "pip"
-    pip_cmd = str(pip_path) if pip_path.exists() else f"{PYTHON} -m pip"
     
-    # Suppress the warning by setting environment variable
-    env = os.environ.copy()
-    env["PIP_NO_WARN_SCRIPT_LOCATION"] = "1"
+    # 安装后端依赖
+    if not backend_ok:
+        print("  Installing backend dependencies...")
+        result = subprocess.run(
+            [PYTHON, "-m", "pip", "install", "-r", str(BACKEND_DIR / "requirements.txt"), "-q"],
+            capture_output=True,
+            text=True,
+            timeout=120  # 2分钟超时
+        )
+        if result.returncode != 0:
+            print(f"[WARN] Some backend packages may not be installed: {result.stderr[:200]}")
     
-    result = subprocess.run(
-        [PYTHON, "-m", "pip", "install", "-r", str(BACKEND_DIR / "requirements.txt"), "-q", "--disable-pip-version-check"],
-        capture_output=True,
-        text=True,
-        env=env
-    )
+    # 安装前端依赖
+    if not frontend_ok:
+        print("  Installing frontend dependencies...")
+        result = subprocess.run(
+            ["npm", "install"],
+            cwd=str(FRONTEND_DIR),
+            capture_output=True,
+            text=True,
+            timeout=180  # 3分钟超时
+        )
+        if result.returncode != 0:
+            print(f"[WARN] Frontend install may have issues: {result.stderr[:200]}")
     
-    # Check for warnings about invalid distributions and clean them up
-    if "~11" in result.stderr:
-        print("Cleaning up invalid pip packages...")
-        cleanup_invalid_packages()
-    
-    if not (FRONTEND_DIR / "node_modules").exists():
-        print("Installing frontend deps...")
-        subprocess.run(["npm", "install", "--silent"], cwd=str(FRONTEND_DIR), check=False)
-    print("Done.")
+    print("[OK] Dependencies ready")
 
 
 def cleanup_invalid_packages():
