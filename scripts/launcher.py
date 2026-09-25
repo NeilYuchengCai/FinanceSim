@@ -188,7 +188,7 @@ def start_backend(host="127.0.0.1", background=True):
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL
         )
-        time.sleep(2)  # 短暂等待以确保启动
+        time.sleep(4)  # 等待后端完全启动
         return proc.pid
     else:
         # 前台启动（用于调试）
@@ -198,13 +198,16 @@ def start_backend(host="127.0.0.1", background=True):
 def start_frontend(background=True):
     """启动前端服务"""
     print("Starting frontend (port 5173)...")
-    cmd = ["npm", "run", "dev"]
+    
+    # 使用完整路径或确保npm在PATH中
+    npm_cmd = ["npm", "run", "dev"]
     
     if background:
         # 后台启动
         proc = subprocess.Popen(
-            cmd,
+            npm_cmd,
             cwd=str(FRONTEND_DIR),
+            shell=True,  # 使用shell来确保找到npm
             creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL
@@ -213,7 +216,7 @@ def start_frontend(background=True):
         return proc.pid
     else:
         # 前台启动
-        return subprocess.run(cmd, cwd=str(FRONTEND_DIR)).returncode
+        return subprocess.run(npm_cmd, cwd=str(FRONTEND_DIR), shell=True).returncode
 
 
 def get_local_ip():
