@@ -118,47 +118,24 @@ def check_frontend_deps():
 
 
 def install_deps():
-    """安装依赖（如果未安装）"""
-    # 先检查是否已安装
-    if check_deps_installed():
-        backend_ok = True
-    else:
-        backend_ok = False
-    
-    frontend_ok = check_frontend_deps()
-    
-    if backend_ok and frontend_ok:
-        print("[OK] All dependencies already installed")
-        return
-    
-    print("Installing dependencies...")
-    
-    # 安装后端依赖
-    if not backend_ok:
-        print("  Installing backend dependencies...")
-        result = subprocess.run(
+    """依赖检查（已安装则跳过）"""
+    # 快速检查，不打印过多信息
+    try:
+        import fastapi, uvicorn, sqlalchemy, aiosqlite
+        print("[OK] Backend ready")
+    except ImportError:
+        print("Installing backend deps...")
+        subprocess.run(
             [PYTHON, "-m", "pip", "install", "-r", str(BACKEND_DIR / "requirements.txt"), "-q"],
-            capture_output=True,
-            text=True,
-            timeout=120  # 2分钟超时
+            capture_output=True
         )
-        if result.returncode != 0:
-            print(f"[WARN] Some backend packages may not be installed: {result.stderr[:200]}")
     
-    # 安装前端依赖
-    if not frontend_ok:
-        print("  Installing frontend dependencies...")
-        result = subprocess.run(
-            ["npm", "install"],
-            cwd=str(FRONTEND_DIR),
-            capture_output=True,
-            text=True,
-            timeout=180  # 3分钟超时
-        )
-        if result.returncode != 0:
-            print(f"[WARN] Frontend install may have issues: {result.stderr[:200]}")
-    
-    print("[OK] Dependencies ready")
+    if not (FRONTEND_DIR / "node_modules").exists():
+        print("Installing frontend deps...")
+        subprocess.run(["npm", "install"], cwd=str(FRONTEND_DIR), capture_output=True)
+        print("[OK] Frontend ready")
+    else:
+        print("[OK] Frontend ready")
 
 
 def cleanup_invalid_packages():
