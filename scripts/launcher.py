@@ -177,19 +177,29 @@ def cleanup_invalid_packages():
 def start_backend(host="127.0.0.1", background=True):
     """启动后端服务"""
     print(f"Starting backend (port 8000)...")
-    cmd = [PYTHON, "-m", "uvicorn", "app.main:app", "--reload", f"--host={host}", "--port=8000", "--log-level=warning"]
+    cmd = [PYTHON, "-m", "uvicorn", "app.main:app", f"--host={host}", "--port=8000", "--log-level=warning"]
     
+    # 不使用 --reload，避免后台运行时的问题
     if background:
-        # 后台启动，不等待
-        proc = subprocess.Popen(
-            cmd,
-            cwd=str(BACKEND_DIR),
-            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
-        )
-        time.sleep(4)  # 等待后端完全启动
-        return proc.pid
+        # 后台启动，重定向输出到日志文件
+        log_file = PROJECT_ROOT / "backend.log"
+        with open(log_file, 'w', encoding='utf-8') as f:
+            proc = subprocess.Popen(
+                cmd,
+                cwd=str(BACKEND_DIR),
+                stdout=f,
+                stderr=f,
+                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0
+            )
+        time.sleep(5)  # 等待后端完全启动
+        
+        # 检查进程是否还在运行
+        if proc.poll() is None:
+            print(f"Backend started successfully (PID: {proc.pid})")
+            return proc.pid
+        else:
+            print(f"[ERROR] Backend failed to start. Check {log_file}")
+            sys.exit(1)
     else:
         # 前台启动（用于调试）
         return subprocess.run(cmd, cwd=str(BACKEND_DIR)).returncode
@@ -203,17 +213,26 @@ def start_frontend(background=True):
     npm_cmd = ["npm", "run", "dev"]
     
     if background:
-        # 后台启动
-        proc = subprocess.Popen(
-            npm_cmd,
-            cwd=str(FRONTEND_DIR),
-            shell=True,  # 使用shell来确保找到npm
-            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
-        )
-        time.sleep(3)  # 短暂等待以确保启动
-        return proc.pid
+        # 后台启动，重定向输出
+        log_file = PROJECT_ROOT / "frontend.log"
+        with open(log_file, 'w', encoding='utf-8') as f:
+            proc = subprocess.Popen(
+                npm_cmd,
+                cwd=str(FRONTEND_DIR),
+                shell=True,
+                stdout=f,
+                stderr=f,
+                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0
+            )
+        time.sleep(5)  # 等待前端完全启动
+        
+        # 检查进程是否还在运行
+        if proc.poll() is None:
+            print(f"Frontend started successfully (PID: {proc.pid})")
+            return proc.pid
+        else:
+            print(f"[ERROR] Frontend failed to start. Check {log_file}")
+            sys.exit(1)
     else:
         # 前台启动
         return subprocess.run(npm_cmd, cwd=str(FRONTEND_DIR), shell=True).returncode
