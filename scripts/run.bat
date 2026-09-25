@@ -43,7 +43,12 @@ set "PID=%TEMP%\fs_pid.txt"
 echo Installing...
 "%PYTHON%" -m pip install -r "%BDIR%\requirements.txt" -q
 if errorlevel 1 echo [WARN] pip issues
-cmd /c "cd /d \"%FDIR%\" && npm ci --silent >nul 2>&1 || npm install --silent >nul 2>&1"
+if not exist "%FDIR%\node_modules" (
+    echo Installing frontend deps...
+    cmd /c "cd /d \"%FDIR%\" && npm install --silent"
+) else (
+    echo Frontend deps already installed.
+)
 echo Done.
 goto :eof
 
