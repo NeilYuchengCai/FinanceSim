@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FinanceSim 新手引导</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 800px;
+            width: 100%;
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+        .header h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+        .header p {
+            opacity: 0.9;
+            font-size: 16px;
+        }
+        .content {
+            padding: 40px;
+        }
+        .section {
+            margin-bottom: 30px;
+        }
+        .section h2 {
+            color: #667eea;
+            font-size: 24px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .section h2 .icon {
+            font-size: 28px;
+        }
+        .section p {
+            color: #666;
+            line-height: 1.8;
+            margin-bottom: 15px;
+        }
+        .feature-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .feature-item {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 12px;
+            border-left: 4px solid #667eea;
+        }
+        .feature-item h3 {
+            color: #333;
+            font-size: 16px;
+            margin-bottom: 8px;
+        }
+        .feature-item p {
+            color: #666;
+            font-size: 14px;
+            margin: 0;
+        }
+        .steps {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 12px;
+            margin-top: 20px;
+        }
+        .step {
+            display: flex;
+            align-items: flex-start;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .step:last-child {
+            margin-bottom: 0;
+        }
+        .step-number {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+        .step-content h3 {
+            color: #333;
+            font-size: 16px;
+            margin-bottom: 5px;
+        }
+        .step-content p {
+            color: #666;
+            font-size: 14px;
+            margin: 0;
+        }
+        .start-btn {
+            display: block;
+            width: 100%;
+            padding: 18px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-top: 30px;
+        }
+        .start-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+        }
+        .tip-box {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        .tip-box strong {
+            color: #1976d2;
+        }
+        .tip-box p {
+            color: #555;
+            margin: 0;
+            font-size: 14px;
+        }
+        .emoji {
+            font-size: 48px;
+            text-align: center;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="emoji">📈</div>
+            <h1>欢迎使用 FinanceSim</h1>
+            <p>您的个人金融市场模拟器</p>
+        </div>
+        
+        <div class="content">
+            <div class="section">
+                <h2><span class="icon">🎯</span> 功能特点</h2>
+                <div class="feature-list">
+                    <div class="feature-item">
+                        <h3>📊 多市场支持</h3>
+                        <p>股票、外汇、债券、商品、宏观经济</p>
+                    </div>
+                    <div class="feature-item">
+                        <h3>🤖 AI 交易员</h3>
+                        <p>4种策略自动交易</p>
+                    </div>
+                    <div class="feature-item">
+                        <h3>📰 事件系统</h3>
+                        <p>实时新闻与事件传播</p>
+                    </div>
+                    <div class="feature-item">
+                        <h3>📈 专业图表</h3>
+                        <p>K线图、技术指标叠加</p>
+                    </div>
+                    <div class="feature-item">
+                        <h3>🌍 宏观经济</h3>
+                        <p>GDP、CPI、利率模拟</p>
+                    </div>
+                    <div class="feature-item">
+                        <h3>🏆 挑战模式</h3>
+                        <p>6个预设挑战任务</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="section">
+                <h2><span class="icon">🚀</span> 快速开始</h2>
+                <div class="steps">
+                    <div class="step">
+                        <div class="step-number">1</div>
+                        <div class="step-content">
+                            <h3>启动应用</h3>
+                            <p>双击 <code>scripts/start.py</code> 或 <code>scripts/run.bat</code></p>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">2</div>
+                        <div class="step-content">
+                            <h3>访问前端</h3>
+                            <p>浏览器自动打开 <strong>http://localhost:5173</strong></p>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">3</div>
+                        <div class="step-content">
+                            <h3>浏览市场</h3>
+                            <p>点击左侧菜单查看股票、外汇、债券、商品等</p>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">4</div>
+                        <div class="step-content">
+                            <h3>开始交易</h3>
+                            <p>选择股票，点击买入/卖出，创建投资组合</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="section">
+                <h2><span class="icon">💡</span> 使用技巧</h2>
+                <div class="tip-box">
+                    <strong>快捷键</strong>
+                    <p>按 <kbd>Ctrl+K</kbd> 或 <kbd>⌘+K</kbd> 打开全局搜索面板</p>
+                </div>
+                <div class="tip-box" style="margin-top: 10px;">
+                    <strong>主题切换</strong>
+                    <p>点击侧边栏底部的按钮切换深色/浅色主题</p>
+                </div>
+                <div class="tip-box" style="margin-top: 10px;">
+                    <strong>推进时间</strong>
+                    <p>在模拟页面点击"下一步"推进市场时间</p>
+                </div>
+            </div>
+            
+            <div class="section">
+                <h2><span class="icon">📚</span> 学习资源</h2>
+                <div class="steps">
+                    <div class="step">
+                        <div class="step-number">📊</div>
+                        <div class="step-content">
+                            <h3>股票市场</h3>
+                            <p>查看A股和美股行情，支持实时下单交易</p>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">💱</div>
+                        <div class="step-content">
+                            <h3>外汇市场</h3>
+                            <p>8个货币对实时报价，支持冲击事件模拟</p>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">🏛️</div>
+                        <div class="step-content">
+                            <h3>债券市场</h3>
+                            <p>查看收益率曲线，计算久期和凸性</p>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">🛢️</div>
+                        <div class="step-content">
+                            <h3>商品市场</h3>
+                            <p>原油、黄金、农产品等10种商品交易</p>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">🌍</div>
+                        <div class="step-content">
+                            <h3>宏观经济</h3>
+                            <p>查看GDP、CPI、利率等经济指标</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <button class="start-btn" onclick="window.open('http://localhost:5173', '_blank')">
+                🚀 立即开始使用
+            </button>
+        </div>
+    </div>
+</body>
+</html>
