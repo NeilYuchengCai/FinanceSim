@@ -9,8 +9,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import init_db, close_db
 from app.config import settings
-from app.routers import worlds, assets, trading, simulation, analytics, events, search, economy, bonds, news as news_router, fx, bot, snapshots, challenges
-from app.engines import EconomicEngine, BondEngine, CentralBank, NewsEngine, FXEngine, BotEngine, EventGenerator, EventPropagation
+from app.routers import worlds, assets, trading, simulation, analytics, events, search, economy, bonds, news as news_router, fx, bot, snapshots, challenges, commodities
+from app.engines import EconomicEngine, BondEngine, CentralBank, NewsEngine, FXEngine, BotEngine, EventGenerator, EventPropagation, CommodityEngine
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)
@@ -25,12 +25,13 @@ _fx_engine = None
 _bot_engine: BotEngine = None
 _event_generator: EventGenerator = None
 _event_propagation: EventPropagation = None
+_commodity_engine: CommodityEngine = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """应用生命周期管理"""
-    global _economic_engine, _central_bank, _bond_engine, _news_engine, _fx_engine, _bot_engine, _event_generator, _event_propagation
+    global _economic_engine, _central_bank, _bond_engine, _news_engine, _fx_engine, _bot_engine, _event_generator, _event_propagation, _commodity_engine
     
     # 启动时初始化
     logger.info("Initializing database...")
@@ -74,6 +75,12 @@ async def lifespan(app: FastAPI):
     events.init_event_engine(_event_generator, _event_propagation)
     logger.info("Event Engine initialized")
 
+    # 初始化商品引擎
+    logger.info("Initializing Commodity Engine...")
+    _commodity_engine = CommodityEngine()
+    commodities.init_commodity_engine(_commodity_engine)
+    logger.info("Commodity Engine initialized")
+
     yield
     
     # 关闭时清理
@@ -112,6 +119,7 @@ app.include_router(fx.router, prefix=settings.API_PREFIX)
 app.include_router(bot.router, prefix=settings.API_PREFIX)
 app.include_router(snapshots.router, prefix=settings.API_PREFIX)
 app.include_router(challenges.router, prefix=settings.API_PREFIX)
+app.include_router(commodities.router, prefix=settings.API_PREFIX)
 
 
 @app.get("/")

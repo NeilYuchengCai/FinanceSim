@@ -1,25 +1,25 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, lazy, Suspense } from 'react'
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom'
 import { useTheme } from './hooks/useTheme'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
-import Overview from './pages/Overview'
-import Markets from './pages/Markets'
-import Equities from './pages/Equities'
-import FX from './pages/FX'
-import Bonds from './pages/Bonds'
-import Portfolio from './pages/Portfolio'
-import Orders from './pages/Orders'
-import News from './pages/News'
-import Search from './pages/Search'
-import Analytics from './pages/Analytics'
-import Economy from './pages/Economy'
-import Simulation from './pages/Simulation'
-import Challenges from './pages/Challenges'
-import Settings from './pages/Settings'
-import WorldCreator from './pages/WorldCreator'
-import Bots from './pages/Bots'
-import Timeline from './pages/Timeline'
 import CommandPalette from './components/CommandPalette'
+import { allLazyRoutes } from './routes'
+
+// Loading 组件
+const PageLoader = () => (
+  <div style={{
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: '400px',
+    color: 'var(--text-secondary)'
+  }}>
+    <div style={{ textAlign: 'center' }}>
+      <div style={{ fontSize: '24px', marginBottom: '8px' }}>⏳</div>
+      <div>加载中...</div>
+    </div>
+  </div>
+)
 
 function App() {
   const { theme, toggleTheme } = useTheme()
@@ -55,6 +55,7 @@ function App() {
     { path: '/equities', label: 'Equities', icon: '📉' },
     { path: '/fx', label: 'FX', icon: '💱' },
     { path: '/bonds', label: 'Bonds', icon: '🏛️' },
+    { path: '/commodities', label: 'Commodities', icon: '🛢️' },
     { path: '/bots', label: 'Bots', icon: '🤖' },
     { path: '/timeline', label: 'Timeline', icon: '⏳' },
     { path: '/portfolio', label: 'Portfolio', icon: '💼' },
@@ -68,6 +69,28 @@ function App() {
     { path: '/settings', label: 'Settings', icon: '⚙️' },
     { path: '/create-world', label: 'Create World', icon: '🌐' },
   ]
+
+  // 动态组件映射
+  const routeComponents = {
+    '/': lazy(allLazyRoutes.Overview),
+    '/markets': lazy(allLazyRoutes.Markets),
+    '/equities': lazy(allLazyRoutes.Equities),
+    '/fx': lazy(allLazyRoutes.FX),
+    '/bonds': lazy(allLazyRoutes.Bonds),
+    '/commodities': lazy(allLazyRoutes.Commodities),
+    '/bots': lazy(allLazyRoutes.Bots),
+    '/timeline': lazy(allLazyRoutes.Timeline),
+    '/portfolio': lazy(allLazyRoutes.Portfolio),
+    '/orders': lazy(allLazyRoutes.Orders),
+    '/news': lazy(allLazyRoutes.News),
+    '/search': lazy(allLazyRoutes.Search),
+    '/analytics': lazy(allLazyRoutes.Analytics),
+    '/economy': lazy(allLazyRoutes.Economy),
+    '/simulation': lazy(allLazyRoutes.Simulation),
+    '/challenges': lazy(allLazyRoutes.Challenges),
+    '/settings': lazy(allLazyRoutes.Settings),
+    '/create-world': lazy(allLazyRoutes.WorldCreator),
+  }
 
   return (
     <Router>
@@ -131,25 +154,13 @@ function App() {
           </div>
         </nav>
         <main className="main-content">
-          <Routes>
-            <Route path="/" element={<Overview />} />
-            <Route path="/markets" element={<Markets />} />
-            <Route path="/equities" element={<Equities />} />
-            <Route path="/fx" element={<FX />} />
-            <Route path="/bonds" element={<Bonds />} />
-            <Route path="/bots" element={<Bots />} />
-            <Route path="/timeline" element={<Timeline />} />
-            <Route path="/portfolio" element={<Portfolio />} />
-            <Route path="/orders" element={<Orders />} />
-            <Route path="/news" element={<News />} />
-            <Route path="/search" element={<Search />} />
-            <Route path="/analytics" element={<Analytics />} />
-            <Route path="/economy" element={<Economy />} />
-            <Route path="/simulation" element={<Simulation />} />
-            <Route path="/challenges" element={<Challenges />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="/create-world" element={<WorldCreator />} />
-          </Routes>
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
+              {Object.entries(routeComponents).map(([path, Component]) => (
+                <Route key={path} path={path} element={<Component />} />
+              ))}
+            </Routes>
+          </Suspense>
         </main>
         <CommandPalette isOpen={paletteOpen} onClose={closePalette} />
       </div>

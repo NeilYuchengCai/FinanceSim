@@ -8,6 +8,7 @@ from app.models.economy import UserEconomy
 from app.models.event import Event, News, MacroSnapshot
 from app.models.snapshot import WorldSnapshot
 from app.models.challenge import Challenge, ChallengeProgress
+from app.models.commodity import Commodity, CommodityPriceHistory
 
 __all__ = [
     "World",
@@ -23,4 +24,7 @@ __all__ = [
     "WorldSnapshot",
     "Challenge",
     "ChallengeProgress",
+    "Commodity",
+    "CommodityPriceHistory",
 ]
+from app.models.commodity import Commodity, CommodityPriceHistory

@@ -31,6 +31,7 @@ class World(Base, TimestampMixin):
     macro_snapshots = relationship("MacroSnapshot", back_populates="world", cascade="all, delete-orphan")
     snapshots = relationship("WorldSnapshot", back_populates="world", cascade="all, delete-orphan")
     challenges = relationship("Challenge", back_populates="world", cascade="all, delete-orphan")
-    
+    commodities = relationship("Commodity", back_populates="world", cascade="all, delete-orphan")
+
     def __repr__(self):
         return f"<World(id={self.id}, name='{self.name}', mode={self.mode})>"

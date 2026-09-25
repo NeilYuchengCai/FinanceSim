@@ -13,6 +13,7 @@ from app.engines.bond_engine import BondEngine, Bond, YieldCurve
 from app.engines.news_engine import NewsEngine, NewsGenerator, NewsImportance
 from app.engines.fx_engine import FXEngine, CurrencyPair
 from app.engines.bot_engine import BotEngine, BotConfig, BotState
+from app.engines.commodity_engine import CommodityEngine
 
 __all__ = [
     "MarketEngine",
@@ -39,5 +40,6 @@ __all__ = [
     "CurrencyPair",
     "BotEngine",
     "BotConfig",
-    "BotState"
+    "BotState",
+    "CommodityEngine",
 ]
