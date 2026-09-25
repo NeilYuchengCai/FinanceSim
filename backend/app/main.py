@@ -54,7 +54,7 @@ async def lifespan(app: FastAPI):
     # 初始化新闻引擎
     logger.info("Initializing News Engine...")
     _news_engine = NewsEngine()
-    news.init_news_engine(_news_engine)
+    news_router.init_news_engine(_news_engine)
     logger.info("News Engine initialized")
     
     from app.engines import FXEngine
