@@ -1,9 +1,10 @@
 @echo off
 setlocal enabledelayedexpansion
 
-:: Get project root from script location
-set "SCRIPT_DIR=%~dp0"
-for %%i in ("%SCRIPT_DIR%\..") do set "PROJECT_ROOT=%%~fi"
+:: Get project root - resolve to absolute path
+set "PROOT=%~dp0"
+set "PROOT=%PROOT:~0,-1%"
+for %%i in ("%PROOT%\..") do set "PROOT=%%~fi"
 
 :: Detect Python
 set "PYTHON="
@@ -14,7 +15,7 @@ for %%p in (
 ) do if exist "%%~p" if not defined PYTHON set "PYTHON=%%~p"
 if not defined PYTHON for /f "tokens=*" %%p in ('where python 2^>nul') do set "PYTHON=%%~p"
 if not defined PYTHON (
-    echo [ERROR] Python not found. Install Python 3.12+.
+    echo [ERROR] Python not found.
     pause
     exit /b 1
 )
@@ -27,61 +28,59 @@ for %%n in (
 ) do if exist "%%~n" if not defined NODE set "NODE=%%~n"
 if not defined NODE for /f "tokens=*" %%n in ('where node 2^>nul') do set "NODE=%%~n"
 if not defined NODE (
-    echo [ERROR] Node.js not found. Install Node.js 22+.
+    echo [ERROR] Node.js not found.
     pause
     exit /b 1
 )
 
-:: Paths
-set "BACKEND_DIR=%PROJECT_ROOT%\backend"
-set "FRONTEND_DIR=%PROJECT_ROOT%\frontend"
-set "PID_FILE=%TEMP%\fs_pids.txt"
+:: Paths (absolute, no cd needed)
+set "BDIR=%PROOT%\backend"
+set "FDIR=%PROOT%\frontend"
+set "PID=%TEMP%\fs_pid.txt"
 
-:: Save PIDs
-:save_pids
-(
-echo %BACKEND_PID%
-echo %FRONTEND_PID%
-) > "%PID_FILE%"
-goto :eof
-
-:: Kill PIDs
-:kill_pids
-if exist "%PID_FILE%" (
-    set /p BPID=<"%PID_FILE%"
-    for /f "skip=1 tokens=*" %%a in ('type "%PID_FILE%"') do set LPID=%%a
-    if defined BPID taskkill /PID !BPID! /F >nul 2>&1
-    if defined LPID taskkill /PID !LPID! /F >nul 2>&1
-    del /f /q "%PID_FILE%" >nul 2>&1
-)
-taskkill /IM uvicorn.exe /T /F >nul 2>&1
-goto :eof
-
-:: Install deps
+:: Install deps (run from correct dirs without changing cwd)
 :install_deps
-echo Installing dependencies...
-cd /d "%BACKEND_DIR%"
-"%PYTHON%" -m pip install -r requirements.txt -q
-if errorlevel 1 echo [WARN] pip install had issues (may be OK)
-cd /d "%FRONTEND_DIR%"
-npm ci --silent >nul 2>&1 || npm install --silent >nul 2>&1
+echo Installing...
+"%PYTHON%" -m pip install -r "%BDIR%\requirements.txt" -q
+if errorlevel 1 echo [WARN] pip issues
+cmd /c "cd /d \"%FDIR%\" && npm ci --silent >nul 2>&1 || npm install --silent >nul 2>&1"
 echo Done.
+goto :eof
+
+:: Kill backend/frontend processes
+:stop_services
+taskkill /IM uvicorn.exe /T /F >nul 2>&1
+taskkill /IM node.exe /F >nul 2>&1
+goto :eof
+
+:: Check if services are running
+:check_services
+netstat -ano 2>nul | findstr ":8000 " >nul 2>&1
+set "_backend=STOPPED"
+if !errorlevel! equ 0 set "_backend=RUNNING"
+netstat -ano 2>nul | findstr ":5173 " >nul 2>&1
+set "_frontend=STOPPED"
+if !errorlevel! equ 0 set "_frontend=RUNNING"
 goto :eof
 
 :menu
 cls
 echo.
-echo   +----------------------------------------+
-echo   |     FinanceSim Control Panel           |
-echo   +----------------------------------------+
+echo ========================================
+echo   FinanceSim Control Panel
+echo ========================================
 echo.
-echo     [1] Start Local Server
-echo     [2] Start LAN Access
-echo     [3] Stop All Services
-echo     [4] Check Status
-echo     [5] Open Browser
-echo     [6] Restart
-echo     [0] Exit
+echo   [1] Start Local Server
+echo   [2] Start LAN Access
+echo   [3] Stop All Services
+echo   [4] Check Status
+echo   [5] Open Browser
+echo   [6] Restart
+echo   [0] Exit
+echo.
+call :check_services
+echo   Backend:  !_backend!
+echo   Frontend: !_frontend!
 echo.
 set /p choice="Choose [0-6]: "
 
@@ -92,7 +91,7 @@ if "!choice!"=="4" goto :check_status
 if "!choice!"=="5" goto :open_browser
 if "!choice!"=="6" goto :restart
 if "!choice!"=="0" goto :exit
-echo Invalid choice.
+echo Invalid.
 timeout /t 2 >nul
 goto :menu
 
@@ -100,27 +99,21 @@ goto :menu
 call :install_deps
 echo.
 echo Starting backend (port 8000)...
-cd /d "%BACKEND_DIR%"
-start "" /min cmd /k "title FS-Backend && \"%PYTHON%\" -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000 --log-level info"
-timeout /t 3 >nul
-for /f "tokens=*" %%a in ('wmic process where "name=\"cmd.exe\" and caption like '%%FS-Backend%%'" get processid 2^>nul ^| findstr /r "[0-9]"') do set "BACKEND_PID=%%a"
+start "" /min cmd /k "title FS-Backend && cd /d \"%BDIR%\" && \"%PYTHON%\" -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000 --log-level info"
+timeout /t 4 >nul
 
 echo Starting frontend (port 5173)...
-cd /d "%FRONTEND_DIR%"
-start "" /min cmd /k "title FS-Frontend && npm run dev"
-timeout /t 4 >nul
-for /f "tokens=*" %%a in ('wmic process where "name=\"cmd.exe\" and caption like '%%FS-Frontend%%'" get processid 2^>nul ^| findstr /r "[0-9]"') do set "FRONTEND_PID=%%a"
-
-call :save_pids
+start "" /min cmd /k "title FS-Frontend && cd /d \"%FDIR%\" && npm run dev"
+timeout /t 5 >nul
 
 echo.
-echo   +----------------------------------------+
-echo   |   http://localhost:5173                |
-echo   |   API: http://localhost:8000/api/v1    |
-echo   |   Docs: http://localhost:8000/docs     |
-echo   +----------------------------------------+
+echo ========================================
+echo   http://localhost:5173
+echo   API:  http://localhost:8000/api/v1
+echo   Docs: http://localhost:8000/docs
+echo ========================================
 echo.
-echo Press any key to return to menu...
+echo Press any key to return...
 pause >nul
 goto :menu
 
@@ -128,18 +121,12 @@ goto :menu
 call :install_deps
 echo.
 echo Starting backend (port 8000, LAN)...
-cd /d "%BACKEND_DIR%"
-start "" /min cmd /k "title FS-Backend && \"%PYTHON%\" -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 --log-level info"
-timeout /t 3 >nul
-for /f "tokens=*" %%a in ('wmic process where "name=\"cmd.exe\" and caption like '%%FS-Backend%%'" get processid 2^>nul ^| findstr /r "[0-9]"') do set "BACKEND_PID=%%a"
+start "" /min cmd /k "title FS-Backend && cd /d \"%BDIR%\" && \"%PYTHON%\" -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 --log-level info"
+timeout /t 4 >nul
 
 echo Starting frontend (port 5173, LAN)...
-cd /d "%FRONTEND_DIR%"
-start "" /min cmd /k "title FS-Frontend && npm run dev -- --host 0.0.0.0"
-timeout /t 4 >nul
-for /f "tokens=*" %%a in ('wmic process where "name=\"cmd.exe\" and caption like '%%FS-Frontend%%'" get processid 2^>nul ^| findstr /r "[0-9]"') do set "FRONTEND_PID=%%a"
-
-call :save_pids
+start "" /min cmd /k "title FS-Frontend && cd /d \"%FDIR%\" && npm run dev -- --host 0.0.0.0"
+timeout /t 5 >nul
 
 set "LOCAL_IP=unknown"
 for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /C:"IPv4 Address"') do (
@@ -147,50 +134,39 @@ for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /C:"IPv4 Address"') do (
 )
 
 echo.
-echo   +----------------------------------------+
-echo   |   Local:  http://localhost:5173        |
-echo   |   LAN:    http://!LOCAL_IP!:5173       |
-echo   |   API:    http://!LOCAL_IP!:8000/api/v1|
-echo   |                                        |
-echo   |   NOTE: Allow ports 8000/5173 firewall |
-echo   +----------------------------------------+
+echo ========================================
+echo   Local:  http://localhost:5173
+echo   LAN:    http://!LOCAL_IP!:5173
+echo   API:    http://!LOCAL_IP!:8000/api/v1
+echo   NOTE: Allow ports 8000/5173 in Firewall
+echo ========================================
 echo.
-echo Press any key to return to menu...
+echo Press any key to return...
 pause >nul
 goto :menu
 
 :stop_all
 echo.
 echo Stopping all services...
-call :kill_pids
+call :stop_services
 echo Done.
 echo.
-echo Press any key to return to menu...
+echo Press any key to return...
 pause >nul
 goto :menu
 
 :check_status
 cls
 echo.
-echo   +----------------------------------------+
-echo   |           Service Status               |
-echo   +----------------------------------------+
+echo ========================================
+echo         Service Status
+echo ========================================
 echo.
-echo   [Backend - port 8000]
-netstat -ano 2>nul | findstr ":8000" | findstr "LISTENING" >nul 2>&1
-if !errorlevel! equ 0 ( echo     RUNNING  ) else ( echo     STOPPED  )
+call :check_services
+echo   Backend:  !_backend!
+echo   Frontend: !_frontend!
 echo.
-echo   [Frontend - port 5173]
-netstat -ano 2>nul | findstr ":5173" | findstr "LISTENING" >nul 2>&1
-if !errorlevel! equ 0 ( echo     RUNNING  ) else ( echo     STOPPED  )
-echo.
-echo   [Processes]
-tasklist /FI "IMAGENAME eq uvicorn.exe" 2>nul | findstr /I "uvicorn" >nul 2>&1
-if !errorlevel! equ 0 ( echo     uvicorn:   RUNNING ) else ( echo     uvicorn:   stopped )
-tasklist /FI "IMAGENAME eq node.exe" 2>nul | findstr /I "node" >nul 2>&1
-if !errorlevel! equ 0 ( echo     node:      RUNNING ) else ( echo     node:      stopped )
-echo.
-echo Press any key to return to menu...
+echo Press any key to return...
 pause >nul
 goto :menu
 
@@ -201,12 +177,13 @@ goto :menu
 
 :restart
 echo.
-echo Restarting FinanceSim...
-call :stop_all
+echo Restarting...
+call :stop_services
+timeout /t 1 >nul
 goto :start_local
 
 :exit
-call :kill_pids >nul 2>&1
+call :stop_services >nul 2>&1
 echo.
 echo Done.
 timeout /t 1 >nul
