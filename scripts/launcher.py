@@ -97,11 +97,43 @@ def kill_pids():
 
 def install_deps():
     print("Installing dependencies...")
-    subprocess.run([PYTHON, "-m", "pip", "install", "-r", str(BACKEND_DIR / "requirements.txt"), "-q"], check=False)
+    # Use the full Python path for pip to avoid virtualenv issues
+    pip_path = Path(PYTHON).parent / "pip.exe" if sys.platform == "win32" else Path(PYTHON).parent / "bin" / "pip"
+    pip_cmd = str(pip_path) if pip_path.exists() else f"{PYTHON} -m pip"
+    
+    # Suppress the warning by setting environment variable
+    env = os.environ.copy()
+    env["PIP_NO_WARN_SCRIPT_LOCATION"] = "1"
+    
+    result = subprocess.run(
+        [PYTHON, "-m", "pip", "install", "-r", str(BACKEND_DIR / "requirements.txt"), "-q", "--disable-pip-version-check"],
+        capture_output=True,
+        text=True,
+        env=env
+    )
+    
+    # Check for warnings about invalid distributions and clean them up
+    if "~11" in result.stderr:
+        print("Cleaning up invalid pip packages...")
+        cleanup_invalid_packages()
+    
     if not (FRONTEND_DIR / "node_modules").exists():
         print("Installing frontend deps...")
         subprocess.run(["npm", "install", "--silent"], cwd=str(FRONTEND_DIR), check=False)
     print("Done.")
+
+
+def cleanup_invalid_packages():
+    """Remove invalid package directories starting with ~"""
+    import glob
+    invalid_dirs = glob.glob(os.path.join(Path.home(), "AppData", "Local", "Programs", "Python", "Python*", "Lib", "site-packages", "~*"))
+    for dir_path in invalid_dirs:
+        try:
+            import shutil
+            shutil.rmtree(dir_path, ignore_errors=True)
+            print(f"  Removed: {dir_path}")
+        except:
+            pass
 
 
 def start_backend(host="127.0.0.1"):
