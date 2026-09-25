@@ -82,7 +82,10 @@ def save_pids(bp, fp):
 
 def kill_pids():
     if PID_FILE.exists():
-        lines = PID_FILE.read_text().strip().split("\n")
+        try:
+            lines = PID_FILE.read_text(encoding='utf-8', errors='ignore').strip().split("\n")
+        except UnicodeDecodeError:
+            lines = PID_FILE.read_text(encoding='gbk', errors='ignore').strip().split("\n")
         for line in lines:
             try:
                 pid = int(line.strip())
