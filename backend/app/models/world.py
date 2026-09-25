@@ -28,7 +28,6 @@ class World(Base, TimestampMixin):
     positions = relationship("Position", back_populates="world", cascade="all, delete-orphan")
     events = relationship("Event", back_populates="world", cascade="all, delete-orphan")
     news = relationship("News", back_populates="world", cascade="all, delete-orphan")
-    macro_snapshots = relationship("MacroSnapshot", back_populates="world", cascade="all, delete-orphan")
     snapshots = relationship("WorldSnapshot", back_populates="world", cascade="all, delete-orphan")
     challenges = relationship("Challenge", back_populates="world", cascade="all, delete-orphan")
     commodities = relationship("Commodity", back_populates="world", cascade="all, delete-orphan")
