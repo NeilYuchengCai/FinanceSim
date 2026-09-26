@@ -16,6 +16,9 @@
   --accent-blue: #58a6ff;
   --accent-yellow: #d29922;
   --border-color: #30363d;
+  /* 实时价格跳动时的高亮底色（涨绿/跌红），约 600ms 后淡出 */
+  --flash-up-bg: rgba(63, 185, 80, 0.35);
+  --flash-down-bg: rgba(248, 81, 73, 0.35);
 }
 
 [data-theme="light"] {
@@ -29,6 +32,8 @@
   --accent-blue: #0969da;
   --accent-yellow: #9a6700;
   --border-color: #d0d7de;
+  --flash-up-bg: rgba(26, 127, 55, 0.28);
+  --flash-down-bg: rgba(207, 34, 46, 0.28);
 }
 
 body {
@@ -167,11 +172,13 @@ body {
   font-size: 0.85rem;
 }
 
-.stat-change.positive {
+.stat-change.positive,
+.positive {
   color: var(--accent-green);
 }
 
-.stat-change.negative {
+.stat-change.negative,
+.negative {
   color: var(--accent-red);
 }
 
@@ -353,6 +360,48 @@ body {
 .data-source.historical { background: rgba(88, 166, 255, 0.15); color: var(--accent-blue); }
 .data-source.simulated { background: rgba(210, 153, 34, 0.15); color: var(--accent-yellow); }
 .data-source.fallback { background: rgba(139, 148, 158, 0.15); color: var(--text-secondary); }
+
+/* 实时价格跳动：数值变化时高亮，600ms 后淡出，不产生布局位移 */
+@keyframes price-flash-up {
+  from { background-color: var(--flash-up-bg); }
+  to   { background-color: transparent; }
+}
+
+@keyframes price-flash-down {
+  from { background-color: var(--flash-down-bg); }
+  to   { background-color: transparent; }
+}
+
+.price-flash-up {
+  animation: price-flash-up 600ms ease-out;
+  border-radius: 3px;
+}
+
+.price-flash-down {
+  animation: price-flash-down 600ms ease-out;
+  border-radius: 3px;
+}
+
+/* 实时流连接状态指示（不打扰：小圆点 + 文字） */
+.live-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  vertical-align: middle;
+}
+
+.live-status .live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-secondary);
+  transition: background-color 300ms ease;
+}
+
+.live-status.live-on .live-dot { background: var(--accent-green); }
+.live-status.live-off .live-dot { background: var(--accent-yellow); }
 
 /* Keyboard shortcut hint */
 .kbd {

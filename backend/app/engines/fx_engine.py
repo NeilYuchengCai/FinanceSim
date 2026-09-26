@@ -61,7 +61,7 @@ class CurrencyPair:
 class FXEngine:
     """外汇市场引擎"""
     
-    # 主要货币对初始价格
+    # 主要货币对初始价格（当种子文件不可用时的兜底）
     DEFAULT_PAIRS = {
         "EUR/USD": {"base": "EUR", "quote": "USD", "price": 1.0850},
         "GBP/USD": {"base": "GBP", "quote": "USD", "price": 1.2650},
@@ -72,20 +72,65 @@ class FXEngine:
         "NZD/USD": {"base": "NZD", "quote": "USD", "price": 0.6050},
         "USD/CNY": {"base": "USD", "quote": "CNY", "price": 7.2400},
     }
-    
+
+    @staticmethod
+    def _load_seed_pairs() -> Dict[str, dict]:
+        """从资产种子数据加载货币对。
+
+        真实交易所覆盖主要货币对、交叉盘和新兴市场货币对，种子文件缺失时
+        回退到内置的 8 个主要货币对。
+        """
+        import json
+        import os
+
+        seed = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "data", "seed", "fx_pairs.json",
+        )
+        if not os.path.exists(seed):
+            logger.warning("fx_pairs seed not found, falling back to DEFAULT_PAIRS")
+            return dict(FXEngine.DEFAULT_PAIRS)
+
+        try:
+            with open(seed, encoding="utf-8") as f:
+                rows = json.load(f)
+        except Exception as e:
+            logger.warning(f"Failed to read fx seed ({e}), using DEFAULT_PAIRS")
+            return dict(FXEngine.DEFAULT_PAIRS)
+
+        pairs = {}
+        for r in rows:
+            base = (r.get("fundamentals") or {}).get("base")
+            quote = (r.get("fundamentals") or {}).get("quote")
+            price = r.get("current_price")
+            ticker = r.get("ticker")
+            if not (base and quote and price and ticker):
+                continue
+            pairs[ticker] = {
+                "base": base,
+                "quote": quote,
+                "price": float(price),
+                # 外汇日波动按不同 pair 区分：主要货币对波动小，新兴市场大
+                "volatility": float(r.get("volatility") or 0.0065),
+            }
+        return pairs or dict(FXEngine.DEFAULT_PAIRS)
+
     def __init__(self):
         self.pairs: Dict[str, CurrencyPair] = {}
-        self.price_history: Dict[str, List[Dict]] = {pair: [] for pair in self.DEFAULT_PAIRS}
+        self._pair_configs = self._load_seed_pairs()
+        self.price_history: Dict[str, List[Dict]] = {t: [] for t in self._pair_configs}
         self._init_pairs()
-    
+        logger.info(f"FXEngine initialized with {len(self.pairs)} pairs")
+
     def _init_pairs(self):
         """初始化货币对"""
-        for ticker, config in self.DEFAULT_PAIRS.items():
+        for ticker, config in self._pair_configs.items():
             self.pairs[ticker] = CurrencyPair(
                 base=config["base"],
                 quote=config["quote"],
                 ticker=ticker,
-                price=config["price"]
+                price=config["price"],
+                volatility=config.get("volatility", 0.0002),
             )
     
     def step(self, volatility_mult: float = 1.0) -> Dict[str, Dict]:

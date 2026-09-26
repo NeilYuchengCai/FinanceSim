@@ -29,9 +29,10 @@ class AssetResponse(BaseModel):
     market_cap: Optional[float]
     beta: Optional[float]
     volatility: Optional[float]
+    current_price: Optional[float] = None
     fundamentals: Optional[dict]
     created_at: datetime
-    
+
     class Config:
         from_attributes = True
 

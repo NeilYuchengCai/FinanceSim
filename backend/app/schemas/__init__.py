@@ -10,7 +10,12 @@ from pydantic import BaseModel, Field
 
 class WorldCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
-    mode: str = Field(default="simulation", pattern="^(sandbox|simulation|challenge|career)$")
+    # mode 白名单必须与前端 WorldCreator 的三个模式卡片一致。
+    # 此前缺 demo / competitive，点"演示模式""竞技模式"会被 422 拒绝。
+    mode: str = Field(
+        default="simulation",
+        pattern="^(sandbox|simulation|challenge|career|demo|competitive)$",
+    )
     starting_capital: float = Field(default=100000.0, gt=0)
     starting_date: Optional[datetime] = None
     seed: Optional[str] = None
@@ -24,7 +29,9 @@ class WorldResponse(BaseModel):
     mode: str
     current_day: int
     created_at: datetime
-    
+    # 世界列表页要展示随机种子；缺这个字段时前端只能渲染 "-"
+    seed: Optional[str] = None
+
     class Config:
         from_attributes = True
 
@@ -63,8 +70,15 @@ class AssetResponse(BaseModel):
     market_cap: Optional[float]
     beta: Optional[float]
     volatility: Optional[float]
+    current_price: Optional[float] = None
     fundamentals: Optional[Dict[str, Any]]
-    
+    # 真实涨跌幅：由 price_history 最近两根 K 线算出，仅当请求带 with_change=1 时填充。
+    # 没有历史数据时为 None——前端不得再用随机数伪造。
+    prev_close: Optional[float] = None
+    change_pct: Optional[float] = None
+    # 最近一根 K 线的成交量
+    last_volume: Optional[float] = None
+
     class Config:
         from_attributes = True
 

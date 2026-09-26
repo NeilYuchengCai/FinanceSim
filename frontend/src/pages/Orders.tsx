@@ -41,8 +41,8 @@ export default function Orders() {
   const fetchOrders = async () => {
     try {
       const [ordersRes, tradesRes] = await Promise.all([
-        axios.get('/api/trading/orders?world_id=1'),
-        axios.get('/api/trading/trades?world_id=1&limit=50')
+        axios.get('/api/v1/trading/orders?world_id=1'),
+        axios.get('/api/v1/trading/trades?world_id=1&limit=50')
       ])
       setOrders(ordersRes.data || [])
       setTrades(tradesRes.data || [])
@@ -61,7 +61,7 @@ export default function Orders() {
     e.preventDefault()
     setSubmitting(true)
     try {
-      await axios.post(`/api/trading/orders?world_id=1`, {
+      await axios.post(`/api/v1/trading/orders?world_id=1`, {
         asset_ticker: ticker,
         side: side,
         type: type,
@@ -79,7 +79,7 @@ export default function Orders() {
 
   const cancelOrder = async (orderId: string) => {
     try {
-      await axios.put(`/api/trading/orders/${orderId}/cancel?world_id=1`)
+      await axios.put(`/api/v1/trading/orders/${orderId}/cancel?world_id=1`)
       await fetchOrders()
     } catch (err) {
       setError(t('common.error'))

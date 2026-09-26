@@ -3,6 +3,8 @@ FinanceSim Commodity Engine
 负责商品市场模拟，支持能源、贵金属、农产品、工业金属
 """
 import random
+import os
+import json
 import logging
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Dict, List, Optional
@@ -35,64 +37,64 @@ class CommodityEngine:
     # 默认商品列表
     DEFAULT_COMMODITIES = {
         "CL": CommodityConfig(
-            ticker="CL", name="原油 (WTI)", category="ENERGY",
-            subcategory="能源", baseline_price=78.50, volatility=0.025,
+            ticker="CL", name="Crude Oil WTI", category="ENERGY",
+            subcategory="Energy", baseline_price=78.50, volatility=0.025,
             contract_size=1000.0, tick_size=0.01,
             supply=10000000.0, demand=9800000.0, inventory=3500000000.0
         ),
         "BZ": CommodityConfig(
-            ticker="BZ", name="布伦特原油", category="ENERGY",
-            subcategory="能源", baseline_price=82.30, volatility=0.023,
+            ticker="BZ", name="Brent Crude Oil", category="ENERGY",
+            subcategory="Energy", baseline_price=82.30, volatility=0.023,
             contract_size=1000.0, tick_size=0.01,
             supply=9500000.0, demand=9200000.0, inventory=3200000000.0
         ),
         "NG": CommodityConfig(
-            ticker="NG", name="天然气", category="ENERGY",
-            subcategory="能源", baseline_price=2.85, volatility=0.045,
+            ticker="NG", name="Natural Gas", category="ENERGY",
+            subcategory="Energy", baseline_price=2.85, volatility=0.045,
             contract_size=10000.0, tick_size=0.001,
             supply=40000.0, demand=38000.0, inventory=4200000000.0
         ),
         "GC": CommodityConfig(
-            ticker="GC", name="黄金", category="PRECIOUS_METAL",
-            subcategory="贵金属", baseline_price=2035.00, volatility=0.012,
+            ticker="GC", name="Gold", category="PRECIOUS_METAL",
+            subcategory="Precious Metals", baseline_price=2035.00, volatility=0.012,
             contract_size=100.0, tick_size=0.1,
             supply=5000.0, demand=4800.0, inventory=35000.0
         ),
         "SI": CommodityConfig(
-            ticker="SI", name="白银", category="PRECIOUS_METAL",
-            subcategory="贵金属", baseline_price=24.50, volatility=0.018,
+            ticker="SI", name="Silver", category="PRECIOUS_METAL",
+            subcategory="Precious Metals", baseline_price=24.50, volatility=0.018,
             contract_size=5000.0, tick_size=0.005,
             supply=25000.0, demand=23000.0, inventory=80000.0
         ),
         "HG": CommodityConfig(
-            ticker="HG", name="铜", category="METAL",
-            subcategory="工业金属", baseline_price=3.85, volatility=0.015,
+            ticker="HG", name="Copper", category="METAL",
+            subcategory="Industrial Metals", baseline_price=3.85, volatility=0.015,
             contract_size=25000.0, tick_size=0.0005,
             supply=2000000.0, demand=1950000.0, inventory=400000.0
         ),
         "ALI": CommodityConfig(
-            ticker="ALI", name="铝", category="METAL",
-            subcategory="工业金属", baseline_price=2.25, volatility=0.014,
+            ticker="ALI", name="Aluminum", category="METAL",
+            subcategory="Industrial Metals", baseline_price=2.25, volatility=0.014,
             contract_size=25000.0, tick_size=0.0025,
             supply=1800000.0, demand=1750000.0, inventory=350000.0
         ),
         "ZC": CommodityConfig(
-            ticker="ZC", name="玉米", category="AGRICULTURE",
-            subcategory="农产品", baseline_price=4.65, volatility=0.016,
+            ticker="ZC", name="Corn", category="AGRICULTURE",
+            subcategory="Agriculture", baseline_price=4.65, volatility=0.016,
             contract_size=5000.0, tick_size=0.0025,
             seasonality_factor=1.1,
             supply=15000000.0, demand=14500000.0, inventory=2000000000.0
         ),
         "ZW": CommodityConfig(
-            ticker="ZW", name="小麦", category="AGRICULTURE",
-            subcategory="农产品", baseline_price=6.15, volatility=0.018,
+            ticker="ZW", name="Wheat", category="AGRICULTURE",
+            subcategory="Agriculture", baseline_price=6.15, volatility=0.018,
             contract_size=5000.0, tick_size=0.0025,
             seasonality_factor=0.9,
             supply=8000000.0, demand=7800000.0, inventory=1500000000.0
         ),
         "ZS": CommodityConfig(
-            ticker="ZS", name="大豆", category="AGRICULTURE",
-            subcategory="农产品", baseline_price=12.80, volatility=0.017,
+            ticker="ZS", name="Soybean", category="AGRICULTURE",
+            subcategory="Agriculture", baseline_price=12.80, volatility=0.017,
             contract_size=5000.0, tick_size=0.0025,
             seasonality_factor=1.05,
             supply=4500000.0, demand=4300000.0, inventory=900000000.0
@@ -101,21 +103,57 @@ class CommodityEngine:
 
     # 外部冲击类型及影响
     SHOCK_TYPES = {
-        "geopolitical": {"name": "地缘政治冲突", "impact_range": (0.02, 0.08), "affected": ["CL", "BZ", "NG"]},
-        "weather": {"name": "恶劣天气", "impact_range": (0.01, 0.05), "affected": ["ZC", "ZW", "ZS"]},
-        "demand_shock": {"name": "需求冲击", "impact_range": (0.015, 0.04), "affected": ["CL", "HG", "ALI"]},
-        "supply_disruption": {"name": "供应中断", "impact_range": (0.02, 0.06), "affected": ["CL", "NG", "SI"]},
-        "dollar_strength": {"name": "美元走强", "impact_range": (-0.02, -0.005), "affected": ["GC", "SI", "HG", "ALI"]},
+        "geopolitical": {"name": "Geopolitical Conflict", "impact_range": (0.02, 0.08), "affected": ["CL", "BZ", "NG"]},
+        "weather": {"name": "Severe Weather", "impact_range": (0.01, 0.05), "affected": ["ZC", "ZW", "ZS"]},
+        "demand_shock": {"name": "Demand Shock", "impact_range": (0.015, 0.04), "affected": ["CL", "HG", "ALI"]},
+        "supply_disruption": {"name": "Supply Disruption", "impact_range": (0.02, 0.06), "affected": ["CL", "NG", "SI"]},
+        "dollar_strength": {"name": "Stronger US Dollar", "impact_range": (-0.02, -0.005), "affected": ["GC", "SI", "HG", "ALI"]},
     }
 
     def __init__(self):
         self.commodities: Dict[str, Dict] = {}
         self.price_history: Dict[str, List[Dict]] = {}
+        self._configs: Dict[str, CommodityConfig] = self._load_seed_commodities()
         self._init_commodities()
+
+    @staticmethod
+    def _load_seed_commodities() -> Dict[str, CommodityConfig]:
+        """从种子文件加载商品配置；文件缺失或损坏时回退到内置默认列表。"""
+        seed_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "data", "seed", "commodities.json",
+        )
+        try:
+            with open(seed_path, "r", encoding="utf-8") as f:
+                rows = json.load(f)
+        except Exception as exc:  # noqa: BLE001 - 离线兜底
+            logger.warning("Commodity seed load failed (%s), using defaults", exc)
+            return dict(CommodityEngine.DEFAULT_COMMODITIES)
+
+        out: Dict[str, CommodityConfig] = {}
+        for r in rows:
+            ticker = r.get("ticker")
+            if not ticker:
+                continue
+            out[ticker] = CommodityConfig(
+                ticker=ticker,
+                name=r.get("name") or ticker,
+                category=(r.get("category") or "ENERGY").upper(),
+                subcategory=r.get("subcategory") or "",
+                baseline_price=float(r.get("baseline_price") or 0),
+                volatility=float(r.get("volatility") or 0.02),
+                contract_size=float(r.get("contract_size") or 1000.0),
+                tick_size=float(r.get("tick_size") or 0.01),
+                seasonality_factor=float(r.get("seasonality_factor") or 1.0),
+                supply=float(r.get("supply") or 1000000.0),
+                demand=float(r.get("demand") or 950000.0),
+                inventory=float(r.get("inventory") or 500000.0),
+            )
+        return out or dict(CommodityEngine.DEFAULT_COMMODITIES)
 
     def _init_commodities(self):
         """初始化商品"""
-        for ticker, config in self.DEFAULT_COMMODITIES.items():
+        for ticker, config in self._configs.items():
             self.commodities[ticker] = {
                 "config": config,
                 "current_price": config.baseline_price,

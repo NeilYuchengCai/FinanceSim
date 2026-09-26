@@ -1,0 +1,990 @@
+[
+ {
+  "ticker": "EUR/USD",
+  "name": "EUR / USD",
+  "type": "FX",
+  "exchange": "FOREX",
+  "sector": "Currency",
+  "industry": "Major Pair",
+  "currency": "USD",
+  "market_cap": null,
+  "beta": 0.0,
+  "volatility": 0.0065,
+  "current_price": 1.085,
+  "fundamentals": {
+   "base": "EUR",
+   "quote": "USD",
+   "spread_bps": 1.0,
+   "pip": 0.0001
+  }
+ },
+ {
+  "ticker": "GBP/USD",
+  "name": "GBP / USD",
+  "type": "FX",
+  "exchange": "FOREX",
+  "sector": "Currency",
+  "industry": "Major Pair",
+  "currency": "USD",
+  "market_cap": null,
+  "beta": 0.0,
+  "volatility": 0.0072,
+  "current_price": 1.265,
+  "fundamentals": {
+   "base": "GBP",
+   "quote": "USD",
+   "spread_bps": 1.2,
+   "pip": 0.0001
+  }
+ },
+ {
+  "ticker": "USD/JPY",
+  "name": "USD / JPY",
+  "type": "FX",
+  "exchange": "FOREX",
+  "sector": "Currency",
+  "industry": "Major Pair",
+  "currency": "JPY",
+  "market_cap": null,
+  "beta": 0.0,
+  "volatility": 0.0078,
+  "current_price": 151.5,
+  "fundamentals": {
+   "base": "USD",
+   "quote": "JPY",
+   "spread_bps": 1.0,
+   "pip": 0.01
+  }
+ },
+ {
+  "ticker": "USD/CHF",
+  "name": "USD / CHF",
+  "type": "FX",
+  "exchange": "FOREX",
+  "sector": "Currency",
+  "industry": "Major Pair",
+  "currency": "CHF",
+  "market_cap": null,
+  "beta": 0.0,
+  "volatility": 0.0068,
+  "current_price": 0.885,
+  "fundamentals": {
+   "base": "USD",
+   "quote": "CHF",
+   "spread_bps": 1.4,
+   "pip": 0.0001
+  }
+ },
+ {
+  "ticker": "AUD/USD",
+  "name": "AUD / USD",
+  "type": "FX",
+  "exchange": "FOREX",
+  "sector": "Currency",
+  "industry": "Major Pair",
+  "currency": "USD",
+  "market_cap": null,
+  "beta": 0.0,
+  "volatility": 0.0085,
+  "current_price": 0.655,
+  "fundamentals": {
+   "base": "AUD",
+   "quote": "USD",
+   "spread_bps": 1.3,
+   "pip": 0.0001
+  }
+ },
+ {
+  "ticker": "USD/CAD",
+  "name": "USD / CAD",
+  "type": "FX",
+  "exchange": "FOREX",
+  "sector": "Currency",
+  "industry": "Major Pair",
+  "currency": "CAD",
+  "market_cap": null,
+  "beta": 0.0,
+  "volatility": 0.0062,
+  "current_price": 1.365,
+  "fundamentals": {
+   "base": "USD",
+   "quote": "CAD",
+   "spread_bps": 1.3,
+   "pip": 0.0001
+  }
+ },
+ {
+  "ticker": "NZD/USD",
+  "name": "NZD / USD",
+  "type": "FX",
+  "exchange": "FOREX",
+  "sector": "Currency",
+  "industry": "Major Pair",
+  "currency": "USD",
+  "market_cap": null,
+  "beta": 0.0,
+  "volatility": 0.009,
+  "current_price": 0.605,
+  "fundamentals": {
+   "base": "NZD",
+   "quote": "USD",
+   "spread_bps": 1.8,
+   "pip": 0.0001
+  }
+ },
+ {
+  "ticker": "USD/CNY",
+  "name": "USD / CNY",
+  "type": "FX",
+  "exchange": "FOREX",
+  "sector": "Currency",
+  "industry": "Major Pair",
+  "currency": "CNY",
+  "market_cap": null,
+  "beta": 0.0,
+  "volatility": 0.0035,
+  "current_price": 7.24,
+  "fundamentals": {
+   "base": "USD",
+   "quote": "CNY",
+   "spread_bps": 1.6,
+   "pip": 0.0001
+  }
+ },
+ {
+  "ticker": "EUR/JPY",
+  "name": "EUR / JPY",
+  "type": "FX",
+  "exchange": "FOREX",
+  "sector": "Currency",
+  "industry": "Cross Pair",
+  "currency": "JPY",
+  "market_cap": null,
+  "beta": 0.0,
+  "volatility": 0.0088,
+  "current_price": 164.38,
+  "fundamentals": {
+   "base": "EUR",
+   "quote": "JPY",
+   "spread_bps": 2.0,
+   "pip": 0.01
+  }
+ },
+ {
+  "ticker": "GBP/JPY",
+  "name": "GBP / JPY",
+  "type": "FX",
+  "exchange": "FOREX",
+  "sector": "Currency",
+  "industry": "Cross Pair",
+  "currency": "JPY",
+  "market_cap": null,
+  "beta": 0.0,
+  "volatility": 0.0094,
+  "current_price": 191.65,
+  "fundamentals": {
+   "base": "GBP",
+   "quote": "JPY",
+   "spread_bps": 2.5,
+   "pip": 0.01
+  }
+ },
+ {
+  "ticker": "EUR/GBP",
+  "name": "EUR / GBP",
+  "type": "FX",
+  "exchange": "FOREX",
+  "sector": "Currency",
+  "industry": "Cross Pair",
+  "currency": "GBP",
+  "market_cap": null,
+  "beta": 0.0,
+  "volatility": 0.0058,
+  "current_price": 0.8577,
+  "fundamentals": {
+   "base": "EUR",
+   "quote": "GBP",
+   "spread_bps": 1.6,
+   "pip": 0.0001
+  }
+ },
+ {
+  "ticker": "EUR/CHF",
+  "name": "EUR / CHF",
+  "type": "FX",
+  "exchange": "FOREX",
+  "sector": "Currency",
+  "industry": "Cross Pair",
+  "currency": "CHF",
+  "market_cap": null,
+  "beta": 0.0,
+  "volatility": 0.006,
+  "current_price": 0.9602,
+  "fundamentals": {
+   "base": "EUR",
+   "quote": "CHF",
+   "spread_bps": 2.0,
+   "pip": 0.0001
+  }
+ },
+ {
+  "ticker": "GBP/CHF",
+  "name": "GBP / CHF",
+  "type": "FX",
+  "exchange": "FOREX",
+  "sector": "Currency",
+  "industry": "Cross Pair",
+  "currency": "CHF",
+  "market_cap": null,
+  "beta": 0.0,
+  "volatility": 0.0076,
+  "current_price": 1.1195,
+  "fundamentals": {
+   "base": "GBP",
+   "quote": "CHF",
+   "spread_bps": 2.8,
+   "pip": 0.0001
+  }
+ },
+ {
+  "ticker": "AUD/JPY",
+  "name": "AUD / JPY",
+  "type": "FX",
+  "exchange": "FOREX",
+  "sector": "Currency",
+  "industry": "Cross Pair",
+  "currency": "JPY",
+  "market_cap": null,
+  "beta": 0.0,
+  "volatility": 0.0105,
+  "current_price": 99.23,
+  "fundamentals": {
+   "base": "AUD",
+   "quote": "JPY",
+   "spread_bps": 2.6,
+   "pip": 0.01
+  }
+ },
+ {
+  "ticker": "NZD/JPY",
+  "name": "NZD / JPY",
+  "type": "FX",
+  "exchange": "FOREX",
+  "sector": "Currency",
+  "industry": "Cross Pair",
+  "currency": "JPY",
+  "market_cap": null,
+  "beta": 0.0,
+  "volatility": 0.011,
+  "current_price": 91.66,
+  "fundamentals": {
+   "base": "NZD",
+   "quote": "JPY",
+   "spread_bps": 3.2,
+   "pip": 0.01
+  }
+ },
+ {
+  "ticker": "CAD/JPY",
+  "name": "CAD / JPY",
+  "type": "FX",
+  "exchange": "FOREX",
+  "sector": "Currency",
+  "industry": "Cross Pair",
+  "currency": "JPY",
+  "market_cap": null,
+  "beta": 0.0,
+  "volatility": 0.009,
+  "current_price": 110.99,
+  "fundamentals": {
+   "base": "CAD",
+   "quote": "JPY",
+   "spread_bps": 2.6,
+   "pip": 0.01
+  }
+ },
+ {
+  "ticker": "CHF/JPY",
+  "name": "CHF / JPY",
+  "type": "FX",
+  "exchange": "FOREX",
+  "sector": "Currency",
+  "industry": "Cross Pair",
+  "currency": "JPY",
+  "market_cap": null,
+  "beta": 0.0,
+  "volatility": 0.0092,
+  "current_price": 171.19,
+  "fundamentals": {
+   "base": "CHF",
+   "quote": "JPY",
+   "spread_bps": 3.0,
+   "pip": 0.01
+  }
+ },
+ {
+  "ticker": "EUR/AUD",
+  "name": "EUR / AUD",
+  "type": "FX",
+  "exchange": "FOREX",
+  "sector": "Currency",
+  "industry": "Cross Pair",
+  "currency": "AUD",
+  "market_cap": null,
+  "beta": 0.0,
+  "volatility": 0.0095,
+  "current_price": 1.6565,
+  "fundamentals": {
+   "base": "EUR",
+   "quote": "AUD",
+   "spread_bps": 3.0,
+   "pip": 0.0001
+  }
+ },
+ {
+  "ticker": "EUR/CAD",
+  "name": "EUR / CAD",
+  "type": "FX",
+  "exchange": "FOREX",
+  "sector": "Currency",
+  "industry": "Cross Pair",
+  "currency": "CAD",
+  "market_cap": null,
+  "beta": 0.0,
+  "volatility": 0.008,
+  "current_price": 1.481,
+  "fundamentals": {
+   "base": "EUR",
+   "quote": "CAD",
+   "spread_bps": 3.0,
+   "pip": 0.0001
+  }
+ },
+ {
+  "ticker": "GBP/AUD",
+  "name": "GBP / AUD",
+  "type": "FX",
+  "exchange": "FOREX",
+  "sector": "Currency",
+  "industry": "Cross Pair",
+  "currency": "AUD",
+  "market_cap": null,
+  "beta": 0.0,
+  "volatility": 0.0105,
+  "current_price": 1.9313,
+  "fundamentals": {
+   "base": "GBP",
+   "quote": "AUD",
+   "spread_bps": 3.5,
+   "pip": 0.0001
+  }
+ },
+ {
+  "ticker": "USD/MXN",
+  "name": "USD / MXN",
+  "type": "FX",
+  "exchange": "FOREX",
+  "sector": "Currency",
+  "industry": "Emerging Market Pair",
+  "currency": "MXN",
+  "market_cap": null,
+  "beta": 0.0,
+  "volatility": 0.0125,
+  "current_price": 17.1,
+  "fundamentals": {
+   "base": "USD",
+   "quote": "MXN",
+   "spread_bps": 8.0,
+   "pip": 0.0001
+  }
+ },
+ {
+  "ticker": "USD/BRL",
+  "name": "USD / BRL",
+  "type": "FX",
+  "exchange": "FOREX",
+  "sector": "Currency",
+  "industry": "Emerging Market Pair",
+  "currency": "BRL",
+  "market_cap": null,
+  "beta": 0.0,
+  "volatility": 0.0135,
+  "current_price": 5.05,
+  "fundamentals": {
+   "base": "USD",
+   "quote": "BRL",
+   "spread_bps": 10.0,
+   "pip": 0.0001
+  }
+ },
+ {
+  "ticker": "USD/KRW",
+  "name": "USD / KRW",
+  "type": "FX",
+  "exchange": "FOREX",
+  "sector": "Currency",
+  "industry": "Emerging Market Pair",
+  "currency": "KRW",
+  "market_cap": null,
+  "beta": 0.0,
+  "volatility": 0.0075,
+  "current_price": 1340.0,
+  "fundamentals": {
+   "base": "USD",
+   "quote": "KRW",
+   "spread_bps": 6.0,
+   "pip": 0.0001
+  }
+ },
+ {
+  "ticker": "USD/INR",
+  "name": "USD / INR",
+  "type": "FX",
+  "exchange": "FOREX",
+  "sector": "Currency",
+  "industry": "Emerging Market Pair",
+  "currency": "INR",
+  "market_cap": null,
+  "beta": 0.0,
+  "volatility": 0.0038,
+  "current_price": 83.3,
+  "fundamentals": {
+   "base": "USD",
+   "quote": "INR",
+   "spread_bps": 4.0,
+   "pip": 0.0001
+  }
+ },
+ {
+  "ticker": "USD/SGD",
+  "name": "USD / SGD",
+  "type": "FX",
+  "exchange": "FOREX",
+  "sector": "Currency",
+  "industry": "Emerging Market Pair",
+  "currency": "SGD",
+  "market_cap": null,
+  "beta": 0.0,
+  "volatility": 0.0038,
+  "current_price": 1.34,
+  "fundamentals": {
+   "base": "USD",
+   "quote": "SGD",
+   "spread_bps": 3.0,
+   "pip": 0.0001
+  }
+ },
+ {
+  "ticker": "USD/HKD",
+  "name": "USD / HKD",
+  "type": "FX",
+  "exchange": "FOREX",
+  "sector": "Currency",
+  "industry": "Emerging Market Pair",
+  "currency": "HKD",
+  "market_cap": null,
+  "beta": 0.0,
+  "volatility": 0.0012,
+  "current_price": 7.82,
+  "fundamentals": {
+   "base": "USD",
+   "quote": "HKD",
+   "spread_bps": 3.0,
+   "pip": 0.0001
+  }
+ },
+ {
+  "ticker": "USD/ZAR",
+  "name": "USD / ZAR",
+  "type": "FX",
+  "exchange": "FOREX",
+  "sector": "Currency",
+  "industry": "Emerging Market Pair",
+  "currency": "ZAR",
+  "market_cap": null,
+  "beta": 0.0,
+  "volatility": 0.0155,
+  "current_price": 18.7,
+  "fundamentals": {
+   "base": "USD",
+   "quote": "ZAR",
+   "spread_bps": 14.0,
+   "pip": 0.0001
+  }
+ },
+ {
+  "ticker": "USD/TRY",
+  "name": "USD / TRY",
+  "type": "FX",
+  "exchange": "FOREX",
+  "sector": "Currency",
+  "industry": "Emerging Market Pair",
+  "currency": "TRY",
+  "market_cap": null,
+  "beta": 0.0,
+  "volatility": 0.018,
+  "current_price": 32.0,
+  "fundamentals": {
+   "base": "USD",
+   "quote": "TRY",
+   "spread_bps": 20.0,
+   "pip": 0.0001
+  }
+ },
+ {
+  "ticker": "USD/RUB",
+  "name": "USD / RUB",
+  "type": "FX",
+  "exchange": "FOREX",
+  "sector": "Currency",
+  "industry": "Emerging Market Pair",
+  "currency": "RUB",
+  "market_cap": null,
+  "beta": 0.0,
+  "volatility": 0.022,
+  "current_price": 92.0,
+  "fundamentals": {
+   "base": "USD",
+   "quote": "RUB",
+   "spread_bps": 25.0,
+   "pip": 0.0001
+  }
+ },
+ {
+  "ticker": "USD/IDR",
+  "name": "USD / IDR",
+  "type": "FX",
+  "exchange": "FOREX",
+  "sector": "Currency",
+  "industry": "Emerging Market Pair",
+  "currency": "IDR",
+  "market_cap": null,
+  "beta": 0.0,
+  "volatility": 0.0072,
+  "current_price": 15800.0,
+  "fundamentals": {
+   "base": "USD",
+   "quote": "IDR",
+   "spread_bps": 12.0,
+   "pip": 0.0001
+  }
+ },
+ {
+  "ticker": "USD/THB",
+  "name": "USD / THB",
+  "type": "FX",
+  "exchange": "FOREX",
+  "sector": "Currency",
+  "industry": "Emerging Market Pair",
+  "currency": "THB",
+  "market_cap": null,
+  "beta": 0.0,
+  "volatility": 0.0062,
+  "current_price": 36.2,
+  "fundamentals": {
+   "base": "USD",
+   "quote": "THB",
+   "spread_bps": 6.0,
+   "pip": 0.0001
+  }
+ },
+ {
+  "ticker": "USD/MYR",
+  "name": "USD / MYR",
+  "type": "FX",
+  "exchange": "FOREX",
+  "sector": "Currency",
+  "industry": "Emerging Market Pair",
+  "currency": "MYR",
+  "market_cap": null,
+  "beta": 0.0,
+  "volatility": 0.0058,
+  "current_price": 4.72,
+  "fundamentals": {
+   "base": "USD",
+   "quote": "MYR",
+   "spread_bps": 8.0,
+   "pip": 0.0001
+  }
+ },
+ {
+  "ticker": "USD/PHP",
+  "name": "USD / PHP",
+  "type": "FX",
+  "exchange": "FOREX",
+  "sector": "Currency",
+  "industry": "Emerging Market Pair",
+  "currency": "PHP",
+  "market_cap": null,
+  "beta": 0.0,
+  "volatility": 0.0055,
+  "current_price": 56.5,
+  "fundamentals": {
+   "base": "USD",
+   "quote": "PHP",
+   "spread_bps": 7.0,
+   "pip": 0.0001
+  }
+ },
+ {
+  "ticker": "USD/SEK",
+  "name": "USD / SEK",
+  "type": "FX",
+  "exchange": "FOREX",
+  "sector": "Currency",
+  "industry": "Emerging Market Pair",
+  "currency": "SEK",
+  "market_cap": null,
+  "beta": 0.0,
+  "volatility": 0.0092,
+  "current_price": 10.6,
+  "fundamentals": {
+   "base": "USD",
+   "quote": "SEK",
+   "spread_bps": 5.0,
+   "pip": 0.0001
+  }
+ },
+ {
+  "ticker": "USD/NOK",
+  "name": "USD / NOK",
+  "type": "FX",
+  "exchange": "FOREX",
+  "sector": "Currency",
+  "industry": "Emerging Market Pair",
+  "currency": "NOK",
+  "market_cap": null,
+  "beta": 0.0,
+  "volatility": 0.0095,
+  "current_price": 10.7,
+  "fundamentals": {
+   "base": "USD",
+   "quote": "NOK",
+   "spread_bps": 6.0,
+   "pip": 0.0001
+  }
+ },
+ {
+  "ticker": "USD/DKK",
+  "name": "USD / DKK",
+  "type": "FX",
+  "exchange": "FOREX",
+  "sector": "Currency",
+  "industry": "Emerging Market Pair",
+  "currency": "DKK",
+  "market_cap": null,
+  "beta": 0.0,
+  "volatility": 0.0068,
+  "current_price": 6.9,
+  "fundamentals": {
+   "base": "USD",
+   "quote": "DKK",
+   "spread_bps": 4.0,
+   "pip": 0.0001
+  }
+ },
+ {
+  "ticker": "USD/PLN",
+  "name": "USD / PLN",
+  "type": "FX",
+  "exchange": "FOREX",
+  "sector": "Currency",
+  "industry": "Emerging Market Pair",
+  "currency": "PLN",
+  "market_cap": null,
+  "beta": 0.0,
+  "volatility": 0.0088,
+  "current_price": 4.0,
+  "fundamentals": {
+   "base": "USD",
+   "quote": "PLN",
+   "spread_bps": 6.0,
+   "pip": 0.0001
+  }
+ },
+ {
+  "ticker": "USD/CZK",
+  "name": "USD / CZK",
+  "type": "FX",
+  "exchange": "FOREX",
+  "sector": "Currency",
+  "industry": "Emerging Market Pair",
+  "currency": "CZK",
+  "market_cap": null,
+  "beta": 0.0,
+  "volatility": 0.009,
+  "current_price": 23.2,
+  "fundamentals": {
+   "base": "USD",
+   "quote": "CZK",
+   "spread_bps": 8.0,
+   "pip": 0.0001
+  }
+ },
+ {
+  "ticker": "USD/HUF",
+  "name": "USD / HUF",
+  "type": "FX",
+  "exchange": "FOREX",
+  "sector": "Currency",
+  "industry": "Emerging Market Pair",
+  "currency": "HUF",
+  "market_cap": null,
+  "beta": 0.0,
+  "volatility": 0.0105,
+  "current_price": 360.0,
+  "fundamentals": {
+   "base": "USD",
+   "quote": "HUF",
+   "spread_bps": 10.0,
+   "pip": 0.0001
+  }
+ },
+ {
+  "ticker": "USD/ILS",
+  "name": "USD / ILS",
+  "type": "FX",
+  "exchange": "FOREX",
+  "sector": "Currency",
+  "industry": "Emerging Market Pair",
+  "currency": "ILS",
+  "market_cap": null,
+  "beta": 0.0,
+  "volatility": 0.0098,
+  "current_price": 3.68,
+  "fundamentals": {
+   "base": "USD",
+   "quote": "ILS",
+   "spread_bps": 8.0,
+   "pip": 0.0001
+  }
+ },
+ {
+  "ticker": "USD/AED",
+  "name": "USD / AED",
+  "type": "FX",
+  "exchange": "FOREX",
+  "sector": "Currency",
+  "industry": "Emerging Market Pair",
+  "currency": "AED",
+  "market_cap": null,
+  "beta": 0.0,
+  "volatility": 0.0006,
+  "current_price": 3.6725,
+  "fundamentals": {
+   "base": "USD",
+   "quote": "AED",
+   "spread_bps": 5.0,
+   "pip": 0.0001
+  }
+ },
+ {
+  "ticker": "USD/SAR",
+  "name": "USD / SAR",
+  "type": "FX",
+  "exchange": "FOREX",
+  "sector": "Currency",
+  "industry": "Emerging Market Pair",
+  "currency": "SAR",
+  "market_cap": null,
+  "beta": 0.0,
+  "volatility": 0.0005,
+  "current_price": 3.75,
+  "fundamentals": {
+   "base": "USD",
+   "quote": "SAR",
+   "spread_bps": 5.0,
+   "pip": 0.0001
+  }
+ },
+ {
+  "ticker": "USD/CLP",
+  "name": "USD / CLP",
+  "type": "FX",
+  "exchange": "FOREX",
+  "sector": "Currency",
+  "industry": "Emerging Market Pair",
+  "currency": "CLP",
+  "market_cap": null,
+  "beta": 0.0,
+  "volatility": 0.011,
+  "current_price": 960.0,
+  "fundamentals": {
+   "base": "USD",
+   "quote": "CLP",
+   "spread_bps": 12.0,
+   "pip": 0.0001
+  }
+ },
+ {
+  "ticker": "USD/COP",
+  "name": "USD / COP",
+  "type": "FX",
+  "exchange": "FOREX",
+  "sector": "Currency",
+  "industry": "Emerging Market Pair",
+  "currency": "COP",
+  "market_cap": null,
+  "beta": 0.0,
+  "volatility": 0.013,
+  "current_price": 3950.0,
+  "fundamentals": {
+   "base": "USD",
+   "quote": "COP",
+   "spread_bps": 15.0,
+   "pip": 0.0001
+  }
+ },
+ {
+  "ticker": "USD/ARS",
+  "name": "USD / ARS",
+  "type": "FX",
+  "exchange": "FOREX",
+  "sector": "Currency",
+  "industry": "Emerging Market Pair",
+  "currency": "ARS",
+  "market_cap": null,
+  "beta": 0.0,
+  "volatility": 0.03,
+  "current_price": 880.0,
+  "fundamentals": {
+   "base": "USD",
+   "quote": "ARS",
+   "spread_bps": 22.0,
+   "pip": 0.0001
+  }
+ },
+ {
+  "ticker": "USD/EGP",
+  "name": "USD / EGP",
+  "type": "FX",
+  "exchange": "FOREX",
+  "sector": "Currency",
+  "industry": "Emerging Market Pair",
+  "currency": "EGP",
+  "market_cap": null,
+  "beta": 0.0,
+  "volatility": 0.025,
+  "current_price": 47.5,
+  "fundamentals": {
+   "base": "USD",
+   "quote": "EGP",
+   "spread_bps": 18.0,
+   "pip": 0.0001
+  }
+ },
+ {
+  "ticker": "USD/NGN",
+  "name": "USD / NGN",
+  "type": "FX",
+  "exchange": "FOREX",
+  "sector": "Currency",
+  "industry": "Emerging Market Pair",
+  "currency": "NGN",
+  "market_cap": null,
+  "beta": 0.0,
+  "volatility": 0.028,
+  "current_price": 1400.0,
+  "fundamentals": {
+   "base": "USD",
+   "quote": "NGN",
+   "spread_bps": 25.0,
+   "pip": 0.0001
+  }
+ },
+ {
+  "ticker": "USD/TWD",
+  "name": "USD / TWD",
+  "type": "FX",
+  "exchange": "FOREX",
+  "sector": "Currency",
+  "industry": "Emerging Market Pair",
+  "currency": "TWD",
+  "market_cap": null,
+  "beta": 0.0,
+  "volatility": 0.0048,
+  "current_price": 32.2,
+  "fundamentals": {
+   "base": "USD",
+   "quote": "TWD",
+   "spread_bps": 6.0,
+   "pip": 0.0001
+  }
+ },
+ {
+  "ticker": "USD/VND",
+  "name": "USD / VND",
+  "type": "FX",
+  "exchange": "FOREX",
+  "sector": "Currency",
+  "industry": "Emerging Market Pair",
+  "currency": "VND",
+  "market_cap": null,
+  "beta": 0.0,
+  "volatility": 0.0035,
+  "current_price": 25400.0,
+  "fundamentals": {
+   "base": "USD",
+   "quote": "VND",
+   "spread_bps": 14.0,
+   "pip": 0.0001
+  }
+ },
+ {
+  "ticker": "EUR/CNY",
+  "name": "EUR / CNY",
+  "type": "FX",
+  "exchange": "FOREX",
+  "sector": "Currency",
+  "industry": "Emerging Market Pair",
+  "currency": "CNY",
+  "market_cap": null,
+  "beta": 0.0,
+  "volatility": 0.0072,
+  "current_price": 7.855,
+  "fundamentals": {
+   "base": "EUR",
+   "quote": "CNY",
+   "spread_bps": 8.0,
+   "pip": 0.0001
+  }
+ },
+ {
+  "ticker": "GBP/CNY",
+  "name": "GBP / CNY",
+  "type": "FX",
+  "exchange": "FOREX",
+  "sector": "Currency",
+  "industry": "Emerging Market Pair",
+  "currency": "CNY",
+  "market_cap": null,
+  "beta": 0.0,
+  "volatility": 0.008,
+  "current_price": 9.159,
+  "fundamentals": {
+   "base": "GBP",
+   "quote": "CNY",
+   "spread_bps": 10.0,
+   "pip": 0.0001
+  }
+ },
+ {
+  "ticker": "AUD/CNY",
+  "name": "AUD / CNY",
+  "type": "FX",
+  "exchange": "FOREX",
+  "sector": "Currency",
+  "industry": "Emerging Market Pair",
+  "currency": "CNY",
+  "market_cap": null,
+  "beta": 0.0,
+  "volatility": 0.009,
+  "current_price": 4.742,
+  "fundamentals": {
+   "base": "AUD",
+   "quote": "CNY",
+   "spread_bps": 9.0,
+   "pip": 0.0001
+  }
+ }
+]

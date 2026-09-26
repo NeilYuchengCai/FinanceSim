@@ -47,7 +47,7 @@ export default function Bots() {
 
   const fetchBots = async () => {
     try {
-      const res = await axios.get('/api/bot/stats')
+      const res = await axios.get('/api/v1/bots/stats')
       setBots(res.data?.bots || [])
     } catch (err) {
       console.error('Failed to fetch bots:', err)
@@ -62,7 +62,7 @@ export default function Bots() {
 
   const handleStep = async () => {
     try {
-      await axios.post('/api/bot/step')
+      await axios.post('/api/v1/bots/step')
       fetchBots()
     } catch (err) {
       console.error('Step failed:', err)
@@ -72,7 +72,7 @@ export default function Bots() {
   const handleAdd = async () => {
     if (!formData.name.trim()) return
     try {
-      await axios.post('/api/bot/add', formData)
+      await axios.post('/api/v1/bots/add', formData)
       setShowForm(false)
       setFormData({ name: '', strategy: 'momentum', capital: 100000, risk_tolerance: 0.5 })
       fetchBots()
@@ -83,7 +83,7 @@ export default function Bots() {
 
   const handleRemove = async (name: string) => {
     try {
-      await axios.delete(`/api/bot/remove/${encodeURIComponent(name)}`)
+      await axios.delete(`/api/v1/bots/remove/${encodeURIComponent(name)}`)
       fetchBots()
     } catch (err) {
       console.error('Failed to remove bot:', err)

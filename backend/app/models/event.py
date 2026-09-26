@@ -23,6 +23,7 @@ class Event(Base):
     macro_effect = Column(JSON, nullable=True)  # 宏观影响
     sentiment_effect = Column(Float, nullable=True)  # 情绪影响
     propagation_depth = Column(Integer, default=3)
+    duration_days = Column(Integer, default=0)  # 事件影响持续时间（天）
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     # 关系

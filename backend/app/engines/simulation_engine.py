@@ -8,6 +8,14 @@ from datetime import datetime, timedelta
 from typing import Optional, Callable
 from enum import Enum
 
+from app.services.trading_calendar import (
+    holiday_name,
+    is_trading_day,
+    market_status,
+    next_trading_day,
+    weekday_name,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -22,10 +30,11 @@ class SimulationSpeed(Enum):
 class SimulationClock:
     """模拟时钟"""
     
-    def __init__(self, start_time: datetime = None):
+    def __init__(self, start_time: datetime = None, current_day: int = 0):
         self.start_time = start_time or datetime.now()
-        self.current_time = self.start_time
-        self.current_day = 0
+        # 从持久化天数恢复时同步推进模拟时间，保证 tick() 的天数计算与恢复值自洽
+        self.current_time = self.start_time + timedelta(days=current_day)
+        self.current_day = current_day
         self.speed = SimulationSpeed.X1
         self.is_paused = True
         self.last_tick_time = None
@@ -74,23 +83,14 @@ class SimulationClock:
         
         now = time.time()
         elapsed = now - self.last_tick_time
-        
-        # 根据速度计算模拟时间推进
-        if self.speed == SimulationSpeed.X1:
-            sim_duration = elapsed  # 1:1 映射
-        elif self.speed == SimulationSpeed.X10:
-            sim_duration = elapsed * 10
-        elif self.speed == SimulationSpeed.X100:
-            sim_duration = elapsed * 100
-        elif self.speed == SimulationSpeed.X1000:
-            sim_duration = elapsed * 1000
-        else:
-            sim_duration = 0
-        
-        # 推进模拟时间（每分钟为一个 tick）
-        sim_delta = timedelta(minutes=sim_duration)
-        old_day = self.current_day
-        
+
+        # 根据速度计算模拟时间推进：
+        # elapsed 是真实经过的秒数，乘以速度倍率后仍是「秒」的量纲，
+        # 因此统一按秒推进模拟时间（X1 = 1 秒真实时间 -> 1 秒模拟时间）。
+        # PAUSED 的 value 为 0，倍率 0 自然不推进，无需特判。
+        multiplier = self.speed.value if isinstance(self.speed, SimulationSpeed) else 1
+        sim_delta = timedelta(seconds=elapsed * multiplier)
+
         self.current_time += sim_delta
         self.last_tick_time = now
         
@@ -135,10 +135,20 @@ class SimulationClock:
         return self.current_day
     
     def get_status(self) -> dict:
-        """获取时钟状态"""
+        """
+        获取时钟状态。
+        除原有的 current_time / current_day / speed / is_paused 外，
+        附带交易日历信息（星期几、是否交易日、市场状态、下一个交易日、节假日名称）。
+        """
+        sim_time = self.current_time.replace(microsecond=0)
         return {
-            "current_time": self.current_time.isoformat(),
+            "current_time": sim_time.isoformat(),
             "current_day": self.current_day,
             "speed": self.speed.name,
-            "is_paused": self.is_paused
+            "is_paused": self.is_paused,
+            "weekday": weekday_name(sim_time),
+            "is_trading_day": is_trading_day(sim_time),
+            "market_status": market_status(sim_time),
+            "next_trading_day": next_trading_day(sim_time).isoformat(),
+            "holiday_name": holiday_name(sim_time),
         }

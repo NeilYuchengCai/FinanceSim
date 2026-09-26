@@ -25,6 +25,7 @@ class Asset(Base, TimestampMixin):
     market_cap = Column(Float, nullable=True)
     beta = Column(Float, nullable=True)
     volatility = Column(Float, nullable=True)
+    current_price = Column(Float, nullable=True)  # 当前价格
     fundamentals = Column(JSON, nullable=True)
     
     # 关系

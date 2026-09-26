@@ -25,7 +25,7 @@ export default function News() {
       try {
         const params: any = { limit: 50 }
         if (filter !== 'all') params.category = filter
-        const newsRes = await axios.get('/api/news', { params })
+        const newsRes = await axios.get('/api/v1/news', { params })
         setNews(newsRes.data || [])
       } catch (err) {
         setError(t('common.networkError'))

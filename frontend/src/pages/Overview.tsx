@@ -28,8 +28,8 @@ export default function Overview() {
     const fetchData = async () => {
       try {
         const [macroRes, newsRes] = await Promise.all([
-          axios.get('/api/economy/state'),
-          axios.get('/api/news/headlines')
+          axios.get('/api/v1/economy/state'),
+          axios.get('/api/v1/news/headlines')
         ])
         setMacro(macroRes.data)
         setNews(newsRes.data || [])

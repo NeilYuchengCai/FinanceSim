@@ -23,7 +23,7 @@ export default function Economy() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const res = await axios.get('/api/economy/state')
+        const res = await axios.get('/api/v1/economy/state')
         setState(res.data)
       } catch (err) {
         setError(t('common.dataError'))

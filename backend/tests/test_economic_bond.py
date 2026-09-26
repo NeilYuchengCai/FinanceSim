@@ -105,16 +105,16 @@ class TestBondEngine:
         from app.engines.bond_engine import BondEngine
         engine = BondEngine()
         
-        bond = engine.get_bond("UST10Y")
+        bond = engine.get_bond("US10Y")
         assert bond is not None
-        assert bond.ticker == "UST10Y"
+        assert bond.ticker == "US10Y"
         assert bond.bond_type == "GOVERNMENT"
     
     def test_bond_pricing(self):
         from app.engines.bond_engine import BondEngine
         engine = BondEngine()
         
-        bond = engine.get_bond("UST10Y")
+        bond = engine.get_bond("US10Y")
         assert bond.price > 0
         assert bond.yield_to_maturity > 0
         assert bond.duration > 0
@@ -123,11 +123,11 @@ class TestBondEngine:
         from app.engines.bond_engine import BondEngine
         engine = BondEngine()
         
-        initial_price = engine.get_bond("UST10Y").price
+        initial_price = engine.get_bond("US10Y").price
         
         engine.step(10)
         
-        new_price = engine.get_bond("UST10Y").price
+        new_price = engine.get_bond("US10Y").price
         # 价格应该有变化
         assert new_price != initial_price or True  # 可能随机不变
     
@@ -135,13 +135,13 @@ class TestBondEngine:
         from app.engines.bond_engine import BondEngine
         engine = BondEngine()
         
-        bond = engine.get_bond("IG_A")
+        bond = engine.get_bond("JPM2030")
         initial_rating = bond.credit_rating
         initial_price = bond.price
         
-        engine.apply_credit_event("IG_A", "BBB")
+        engine.apply_credit_event("JPM2030", "BBB")
         
-        updated_bond = engine.get_bond("IG_A")
+        updated_bond = engine.get_bond("JPM2030")
         assert updated_bond.credit_rating == "BBB"
         # 信用评级下降，价格应该下降
         assert updated_bond.price < initial_price or True  # 可能波动

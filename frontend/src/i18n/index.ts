@@ -1,3 +1,5 @@
+import { useSyncExternalStore } from 'react'
+
 /**
  * 中文翻译字典 - 完整版
  */
@@ -74,7 +76,7 @@ export const zhCN = {
   // 市场
   markets: {
     title: '市场概览',
-    subtitle: '市场概况和指数',
+    subtitle: '指数行情、市场广度与板块表现',
     summary: '市场摘要',
     topGainers: '涨幅榜',
     topLosers: '跌幅榜',
@@ -82,9 +84,27 @@ export const zhCN = {
     bySector: '按板块',
     byExchange: '按交易所',
     marketBreadth: '市场广度',
-    advancing: '上涨',
-    declining: '下跌',
+    code: '代码',
+    name: '名称',
+    price: '现价',
+    change: '涨跌幅',
+    volume: '成交量',
+    advancing: '上涨家数',
+    declining: '下跌家数',
     unchanged: '持平',
+    ofTotal: '占比',
+    adLine: '腾落线 A-D',
+    adRatio: '涨跌比',
+    avgChange: '平均涨跌',
+    newHighLow: '新高/新低',
+    distribution: '涨跌幅分布',
+    instruments: '只标的',
+    sectors: '板块表现',
+    sector: '板块',
+    count: '数量',
+    gainers: '涨幅榜',
+    losers: '跌幅榜',
+    globalIndices: '全球主要指数',
   },
   
   // 股票
@@ -263,6 +283,25 @@ export const zhCN = {
     volatility: '波动率',
     beta: 'Beta值',
     alpha: 'Alpha值',
+    returnsAnalysis: '收益分析',
+    riskMetrics: '风险指标',
+    correlationMatrix: '相关性矩阵',
+    drawdownAnalysis: '回撤分析',
+    selectAsset: '选择标的',
+    asset: '标的',
+    sampleDays: '样本天数',
+    cumulativeReturn: '累计收益率',
+    totalReturn: '区间总收益率',
+    annualizedReturn: '年化收益率',
+    annualizedVolatility: '年化波动率',
+    sharpeRatio: '夏普比率',
+    maxDrawdown: '最大回撤',
+    maxDrawdownDate: '发生日期',
+    var95: '95% 单日 VaR',
+    positiveDays: '正收益天数占比',
+    riskFreeRate: '无风险利率',
+    underwaterCurve: '水下曲线',
+    drawdownPct: '回撤',
   },
   
   // 模拟
@@ -278,6 +317,30 @@ export const zhCN = {
     reset: '重置',
     realTime: '实时',
     fastForward: '快进',
+    // Simulation page keys
+    actionFailed: '操作失败',
+    controls: '模拟控制',
+    cyclePhase: '周期阶段',
+    dayPrefix: '第',
+    eventTime: '时间',
+    eventTitle: '事件',
+    eventType: '类型',
+    gdpGrowth: 'GDP 增速',
+    inflation: '通胀率',
+    interestRate: '利率',
+    marketStatus: '市场状态',
+    metric: '指标',
+    nextTradingDay: '下一个交易日',
+    nonTradingDay: '非交易日',
+    paused: '已暂停',
+    play: '播放',
+    running: '运行中',
+    severity: '强度',
+    simTime: '模拟时间',
+    step: '执行一步',
+    todayEvents: '今日事件',
+    tradingDay: '交易日',
+    unemployment: '失业率',
   },
   
   // 挑战
@@ -311,6 +374,14 @@ export const zhCN = {
     dataSources: '数据源',
     offlineMode: '离线模式',
     autoSave: '自动保存',
+    general: '通用设置',
+    simulation: '模拟设置',
+    currencyDisplay: '货币显示',
+    defaultSpeed: '默认速度',
+    dataSource: '数据源',
+    fallback: '内置数据',
+    saved: '设置已保存',
+    preview: '预览',
   },
   
   // 搜索
@@ -343,19 +414,510 @@ export const zhCN = {
 };
 
 /**
+ * English translation dictionary - mirrors zhCN structure key by key
+ */
+export const enUS = {
+  nav: {
+    overview: 'Overview',
+    markets: 'Markets',
+    equities: 'Equities',
+    fx: 'FX',
+    bonds: 'Bonds',
+    commodities: 'Commodities',
+    bots: 'AI Traders',
+    timeline: 'Timeline',
+    portfolio: 'Portfolio',
+    orders: 'Orders',
+    news: 'News',
+    search: 'Search',
+    analytics: 'Analytics',
+    economy: 'Economy',
+    simulation: 'Simulation',
+    challenges: 'Challenges',
+    settings: 'Settings',
+    createWorld: 'Create World',
+  },
+
+  common: {
+    loading: 'Loading...',
+    error: 'Error',
+    success: 'Success',
+    confirm: 'Confirm',
+    cancel: 'Cancel',
+    save: 'Save',
+    delete: 'Delete',
+    edit: 'Edit',
+    refresh: 'Refresh',
+    close: 'Close',
+    back: 'Back',
+    next: 'Next',
+    previous: 'Previous',
+    submit: 'Submit',
+    reset: 'Reset',
+    search: 'Search...',
+    filter: 'Filter',
+    sort: 'Sort',
+    all: 'All',
+    none: 'None',
+    unknown: 'Unknown',
+    noData: 'No data',
+    dataError: 'Failed to load data',
+    networkError: 'Network connection failed',
+    retry: 'Retry',
+  },
+
+  overview: {
+    title: 'Market Overview',
+    subtitle: 'A glance at global financial markets',
+    gdp: 'GDP Growth',
+    inflation: 'Inflation',
+    unemployment: 'Unemployment',
+    interestRate: 'Interest Rate',
+    centralBank: 'Central Bank',
+    policy: 'Monetary Policy',
+    breakingNews: 'Breaking News',
+    importantNews: 'Important News',
+    marketSentiment: 'Market Sentiment',
+    bullish: 'Bullish',
+    bearish: 'Bearish',
+    neutral: 'Neutral',
+  },
+
+  markets: {
+    title: 'Market Overview',
+    subtitle: 'Indices, market breadth and sector performance',
+    summary: 'Market Summary',
+    topGainers: 'Top Gainers',
+    topLosers: 'Top Losers',
+    mostActive: 'Most Active',
+    bySector: 'By Sector',
+    byExchange: 'By Exchange',
+    marketBreadth: 'Market Breadth',
+    code: 'Code',
+    name: 'Name',
+    price: 'Price',
+    change: 'Change',
+    volume: 'Volume',
+    advancing: 'Advancing',
+    declining: 'Declining',
+    unchanged: 'Unchanged',
+    ofTotal: 'Of Total',
+    adLine: 'A-D Line',
+    adRatio: 'Advance/Decline Ratio',
+    avgChange: 'Average Change',
+    newHighLow: 'New Highs / Lows',
+    distribution: 'Change Distribution',
+    instruments: 'instruments',
+    sectors: 'Sector Performance',
+    sector: 'Sector',
+    count: 'Count',
+    gainers: 'Gainers',
+    losers: 'Losers',
+    globalIndices: 'Global Indices',
+  },
+
+  equities: {
+    title: 'Equity Market',
+    subtitle: 'Equity market overview and trading',
+    searchStock: 'Search ticker or company name...',
+    fundamentals: 'Fundamentals',
+    technicals: 'Technicals',
+    news: 'Related News',
+    orderBook: 'Order Book',
+    buy: 'Buy',
+    sell: 'Sell',
+    hold: 'Hold',
+    ticker: 'Ticker',
+    name: 'Name',
+    price: 'Price',
+    change: 'Change',
+    volume: 'Volume',
+    marketCap: 'Market Cap',
+    pe: 'P/E Ratio',
+    sector: 'Sector',
+    exchange: 'Exchange',
+  },
+
+  fx: {
+    title: 'FX Market',
+    subtitle: 'Live currency pair rates',
+    pairs: 'Pairs',
+    bid: 'Bid',
+    ask: 'Ask',
+    spread: 'Spread',
+    change: 'Change',
+    high: 'High',
+    low: 'Low',
+    volume: 'Volume',
+    usdCny: 'USD/CNY',
+    eurUsd: 'EUR/USD',
+    gbpUsd: 'GBP/USD',
+    usdChf: 'USD/CHF',
+  },
+
+  bonds: {
+    title: 'Bond Market',
+    subtitle: 'Government and corporate bonds',
+    yieldCurve: 'Yield Curve',
+    duration: 'Duration',
+    convexity: 'Convexity',
+    coupon: 'Coupon',
+    maturity: 'Maturity',
+    rating: 'Rating',
+    treasury: 'Treasury',
+    corporate: 'Corporate',
+    yield: 'Yield',
+  },
+
+  commodities: {
+    title: 'Commodities',
+    subtitle: 'Commodity trading',
+    energy: 'Energy',
+    metals: 'Metals',
+    agriculture: 'Agriculture',
+    precious: 'Precious Metals',
+    supplyDemand: 'Supply & Demand',
+    inventory: 'Inventory',
+    crudeOil: 'Crude Oil',
+    gold: 'Gold',
+    silver: 'Silver',
+    copper: 'Copper',
+    wheat: 'Wheat',
+  },
+
+  economy: {
+    title: 'Macro Economy',
+    subtitle: 'Economic indicators and trends',
+    gdp: 'GDP',
+    cpi: 'CPI',
+    ppi: 'PPI',
+    unemployment: 'Unemployment',
+    interestRate: 'Interest Rate',
+    moneySupply: 'Money Supply',
+    centralBank: 'Central Bank',
+    policy: 'Monetary Policy',
+    nextReview: 'Next Review',
+    fiscalPolicy: 'Fiscal Policy',
+    governmentDebt: 'Government Debt',
+    tradeBalance: 'Trade Balance',
+  },
+
+  bots: {
+    title: 'AI Traders',
+    subtitle: 'Intelligent trading strategies',
+    value: 'Value Investing',
+    growth: 'Growth Investing',
+    macro: 'Macro Strategy',
+    pairs: 'Pairs Trading',
+    performance: 'Performance',
+    wins: 'Win Rate',
+    trades: 'Trades',
+    profitLoss: 'Profit / Loss',
+    drawdown: 'Drawdown',
+    sharpe: 'Sharpe Ratio',
+  },
+
+  portfolio: {
+    title: 'Portfolio',
+    subtitle: 'Asset management and performance',
+    totalValue: 'Total Value',
+    todayChange: 'Today Change',
+    totalReturn: 'Total Return',
+    allocation: 'Allocation',
+    positions: 'Positions',
+    availableCash: 'Available Cash',
+    realizedPnl: 'Realized P&L',
+    unrealizedPnl: 'Unrealized P&L',
+  },
+
+  orders: {
+    title: 'Orders',
+    subtitle: 'View and manage trade orders',
+    openOrders: 'Open Orders',
+    filledOrders: 'Filled',
+    pendingOrders: 'Pending',
+    cancelOrders: 'Cancelled',
+    orderType: 'Order Type',
+    market: 'Market',
+    limit: 'Limit',
+    stop: 'Stop',
+    quantity: 'Quantity',
+    price: 'Price',
+    status: 'Status',
+  },
+
+  news: {
+    title: 'News',
+    subtitle: 'Market news and events',
+    breaking: 'Breaking',
+    important: 'Important',
+    normal: 'Normal',
+    market: 'Market',
+    economy: 'Economy',
+    company: 'Company',
+    policy: 'Policy',
+    technology: 'Technology',
+  },
+
+  timeline: {
+    title: 'Timeline',
+    subtitle: 'Historical market events',
+    events: 'Events',
+    filters: 'Filters',
+    dateRange: 'Date Range',
+    eventTypes: 'Event Types',
+    marketEvent: 'Market Event',
+    economicEvent: 'Economic Event',
+    corporateEvent: 'Corporate Event',
+  },
+
+  analytics: {
+    title: 'Analytics',
+    subtitle: 'Deep data analysis',
+    performance: 'Performance',
+    risk: 'Risk',
+    correlation: 'Correlation',
+    distribution: 'Distribution',
+    volatility: 'Volatility',
+    beta: 'Beta',
+    alpha: 'Alpha',
+    returnsAnalysis: 'Returns Analysis',
+    riskMetrics: 'Risk Metrics',
+    correlationMatrix: 'Correlation Matrix',
+    drawdownAnalysis: 'Drawdown Analysis',
+    selectAsset: 'Select Asset',
+    asset: 'Asset',
+    sampleDays: 'Sample Days',
+    cumulativeReturn: 'Cumulative Return',
+    totalReturn: 'Period Total Return',
+    annualizedReturn: 'Annualized Return',
+    annualizedVolatility: 'Annualized Volatility',
+    sharpeRatio: 'Sharpe Ratio',
+    maxDrawdown: 'Max Drawdown',
+    maxDrawdownDate: 'Date',
+    var95: '95% 1-Day VaR',
+    positiveDays: 'Positive Days',
+    riskFreeRate: 'Risk-Free Rate',
+    underwaterCurve: 'Underwater Curve',
+    drawdownPct: 'Drawdown',
+  },
+
+  simulation: {
+    title: 'Simulation Settings',
+    subtitle: 'Configure simulation parameters',
+    speed: 'Simulation Speed',
+    startDate: 'Start Date',
+    endDate: 'End Date',
+    seed: 'Random Seed',
+    run: 'Run',
+    pause: 'Pause',
+    reset: 'Reset',
+    realTime: 'Real Time',
+    fastForward: 'Fast Forward',
+    // Simulation page keys
+    actionFailed: 'Action failed',
+    controls: 'Simulation Controls',
+    cyclePhase: 'Cycle Phase',
+    dayPrefix: 'Day',
+    eventTime: 'Time',
+    eventTitle: 'Event',
+    eventType: 'Type',
+    gdpGrowth: 'GDP Growth',
+    inflation: 'Inflation Rate',
+    interestRate: 'Interest Rate',
+    marketStatus: 'Market Status',
+    metric: 'Metric',
+    nextTradingDay: 'Next Trading Day',
+    nonTradingDay: 'Non-Trading Day',
+    paused: 'Paused',
+    play: 'Play',
+    running: 'Running',
+    severity: 'Severity',
+    simTime: 'Sim Time',
+    step: 'Step',
+    todayEvents: 'Today Events',
+    tradingDay: 'Trading Day',
+    unemployment: 'Unemployment',
+  },
+
+  challenges: {
+    title: 'Challenges',
+    subtitle: 'Complete investment objectives',
+    beginner: 'Beginner',
+    intermediate: 'Intermediate',
+    expert: 'Expert',
+    completed: 'Completed',
+    inProgress: 'In Progress',
+    available: 'Available',
+    progress: 'Progress',
+    reward: 'Reward',
+  },
+
+  settings: {
+    title: 'Settings',
+    subtitle: 'Customize application options',
+    language: 'Language',
+    chinese: '简体中文',
+    english: 'English',
+    theme: 'Theme',
+    dark: 'Dark Mode',
+    light: 'Light Mode',
+    notifications: 'Notifications',
+    sound: 'Sound',
+    soundOn: 'Sound On',
+    soundOff: 'Sound Off',
+    dataSources: 'Data Sources',
+    offlineMode: 'Offline Mode',
+    autoSave: 'Auto Save',
+    general: 'General',
+    simulation: 'Simulation',
+    currencyDisplay: 'Currency Display',
+    defaultSpeed: 'Default Speed',
+    dataSource: 'Data Source',
+    fallback: 'Built-in Data',
+    saved: 'Settings saved',
+    preview: 'Preview',
+  },
+
+  search: {
+    title: 'Global Search',
+    subtitle: 'Search assets, news and events',
+    placeholder: 'Type keywords to search...',
+    assets: 'Assets',
+    news: 'News',
+    events: 'Events',
+    results: 'Results',
+    noResults: 'No results found',
+  },
+
+  world: {
+    title: 'World Management',
+    createWorld: 'Create World',
+    restoreWorld: 'Restore World',
+    branchWorld: 'Branch World',
+    snapshot: 'World Snapshot',
+    name: 'Name',
+    description: 'Description',
+    mode: 'Mode',
+    demo: 'Demo Mode',
+    sandbox: 'Sandbox Mode',
+    competitive: 'Competitive Mode',
+    seed: 'Random Seed',
+  },
+};
+
+/* ------------------------------------------------------------------ *
+ * Runtime language switching
+ * ------------------------------------------------------------------ */
+
+export type LanguageCode = 'zh' | 'en'
+
+export const LANG_STORAGE_KEY = 'financesim-lang'
+
+const DICTIONARIES: Record<LanguageCode, Record<string, any>> = {
+  zh: zhCN as unknown as Record<string, any>,
+  en: enUS as unknown as Record<string, any>,
+}
+
+const LANGUAGE_LOCALES: Record<LanguageCode, string> = {
+  zh: 'zh-CN',
+  en: 'en-US',
+}
+
+function readStoredLanguage(): LanguageCode {
+  try {
+    const saved = localStorage.getItem(LANG_STORAGE_KEY)
+    if (saved === 'zh' || saved === 'en') return saved
+  } catch {
+    /* localStorage unavailable (SSR / private mode) - fall through */
+  }
+  return 'zh'
+}
+
+let currentLanguage: LanguageCode = readStoredLanguage()
+const languageListeners = new Set<() => void>()
+
+export function getLanguage(): LanguageCode {
+  return currentLanguage
+}
+
+export function setLanguage(lang: LanguageCode): void {
+  if (lang !== 'zh' && lang !== 'en') return
+  if (lang === currentLanguage) return
+  currentLanguage = lang
+  try {
+    localStorage.setItem(LANG_STORAGE_KEY, lang)
+    document.documentElement.setAttribute('lang', LANGUAGE_LOCALES[lang])
+  } catch {
+    /* ignore storage errors - language still switches in memory */
+  }
+  languageListeners.forEach(listener => listener())
+}
+
+function subscribeLanguage(listener: () => void): () => void {
+  languageListeners.add(listener)
+  return () => {
+    languageListeners.delete(listener)
+  }
+}
+
+/**
+ * Subscribe to language changes so the calling component re-renders.
+ */
+export function useLanguage(): { language: LanguageCode; setLanguage: (lang: LanguageCode) => void } {
+  const language = useSyncExternalStore(subscribeLanguage, getLanguage, () => 'zh' as LanguageCode)
+  return { language, setLanguage }
+}
+
+/**
  * 获取翻译文本的辅助函数
  */
 export function t(key: string, fallback?: string): string {
-  const keys = key.split('.');
-  let obj: any = zhCN;
-  
+  const keys = key.split('.')
+  const dict = DICTIONARIES[currentLanguage] || DICTIONARIES.zh
+
+  let obj: any = dict
+
   for (const k of keys) {
     if (obj && obj[k] !== undefined) {
-      obj = obj[k];
+      obj = obj[k]
     } else {
-      return fallback || key;
+      return fallback || key
     }
   }
-  
-  return typeof obj === 'string' ? obj : key;
+
+  return typeof obj === 'string' ? obj : fallback || key
+}
+
+/* ------------------------------------------------------------------ *
+ * Currency formatting (driven by Settings -> Currency Display)
+ * ------------------------------------------------------------------ */
+
+export type CurrencyCode = 'USD' | 'EUR' | 'CNY' | 'CHF'
+
+export const CURRENCIES: { code: CurrencyCode; symbol: string }[] = [
+  { code: 'USD', symbol: '$' },
+  { code: 'EUR', symbol: '€' },
+  { code: 'CNY', symbol: '¥' },
+  { code: 'CHF', symbol: 'Fr' },
+]
+
+export function isCurrencyCode(value: unknown): value is CurrencyCode {
+  return value === 'USD' || value === 'EUR' || value === 'CNY' || value === 'CHF'
+}
+
+export function formatCurrency(value: number, currency: CurrencyCode = 'USD', language?: LanguageCode): string {
+  const amount = Number.isFinite(value) ? value : 0
+  const locale = LANGUAGE_LOCALES[language || currentLanguage]
+  try {
+    return new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount)
+  } catch {
+    const symbol = CURRENCIES.find(c => c.code === currency)?.symbol || currency
+    return `${symbol}${amount.toFixed(2)}`
+  }
 }

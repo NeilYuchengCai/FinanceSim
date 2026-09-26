@@ -28,22 +28,8 @@ async def list_news(
     if not _news_engine:
         return {"error": "News engine not initialized"}
 
-    # 如果没有任何新闻，先生成一些默认的
-    if not _news_engine.generator.news_items:
-        default_assets = [
-            {"ticker": "AAPL", "name": "Apple Inc", "sector": "Technology"},
-            {"ticker": "MSFT", "name": "Microsoft Corp", "sector": "Technology"},
-            {"ticker": "GOOGL", "name": "Alphabet Inc", "sector": "Technology"},
-            {"ticker": "JPM", "name": "JPMorgan Chase", "sector": "Finance"},
-            {"ticker": "JNJ", "name": "Johnson & Johnson", "sector": "Healthcare"},
-        ]
-        default_macro = {
-            "gdp_growth": 0.025,
-            "inflation": 0.02,
-            "unemployment": 0.05,
-            "interest_rate": 0.05
-        }
-        _news_engine.generate_daily_news(default_assets, default_macro)
+    # 如果没有任何新闻，先播一批默认的，避免首次进入看到空列表
+    _news_engine.ensure_populated()
 
     return _news_engine.generator.get_news(
         limit=limit,
@@ -60,6 +46,7 @@ async def get_briefing(
     if not _news_engine:
         return {"error": "News engine not initialized"}
     
+    _news_engine.ensure_populated()
     return _news_engine.get_briefing(hours)
 
 

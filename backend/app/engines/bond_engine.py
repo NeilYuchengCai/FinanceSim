@@ -4,6 +4,8 @@ FinanceSim Bond Engine
 """
 import math
 import logging
+import json
+import os
 from decimal import Decimal
 from typing import Dict, List, Optional
 from dataclasses import dataclass, field
@@ -206,54 +208,88 @@ class BondEngine:
         # 初始化默认债券
         self._init_bonds()
     
+    # 当资产种子文件不可用时的兜底清单
+    FALLBACK_BONDS = [
+        # ticker, name, type, coupon, maturity_years, rating
+        ("UST1Y", "US 1Y Treasury", "GOVERNMENT", 0.05, 1, "AAA"),
+        ("UST5Y", "US 5Y Treasury", "GOVERNMENT", 0.055, 5, "AAA"),
+        ("UST10Y", "US 10Y Treasury", "GOVERNMENT", 0.06, 10, "AAA"),
+        ("UST30Y", "US 30Y Treasury", "GOVERNMENT", 0.065, 30, "AAA"),
+        ("IG_AAA", "AAA Corporate Bond", "CORPORATE", 0.065, 10, "AAA"),
+        ("IG_A", "A Corporate Bond", "CORPORATE", 0.075, 10, "A"),
+        ("IG_BBB", "BBB Corporate Bond", "CORPORATE", 0.09, 10, "BBB"),
+        ("HY_B", "B Corporate Bond", "CORPORATE", 0.11, 10, "B"),
+        ("HY_HY", "HY Corporate Bond", "CORPORATE", 0.14, 10, "CCC"),
+    ]
+
+    @staticmethod
+    def _load_seed_bonds():
+        """从资产种子数据加载债券清单。
+
+        覆盖各国国债收益率曲线与投资级/高收益公司债；种子文件缺失或不可解析时
+        回退到内置的小清单，保证引擎始终可用。
+        """
+        seed = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "data", "seed", "bonds.json",
+        )
+        if not os.path.exists(seed):
+            logger.warning("bonds seed not found, falling back to builtin list")
+            return None
+        try:
+            with open(seed, encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            logger.warning(f"Failed to read bonds seed ({e}), using builtin list")
+            return None
+
     def _init_bonds(self):
-        """初始化默认债券"""
-        bonds_data = [
-            # 国债
-            ("UST1Y", "US 1Y Treasury", "GOVERNMENT", 0.05, 1),
-            ("UST5Y", "US 5Y Treasury", "GOVERNMENT", 0.055, 5),
-            ("UST10Y", "US 10Y Treasury", "GOVERNMENT", 0.06, 10),
-            ("UST30Y", "US 30Y Treasury", "GOVERNMENT", 0.065, 30),
-            # 投资级公司债
-            ("IG_AAA", "AAA Corporate Bond", "CORPORATE", 0.065, 10),
-            ("IG_A", "A Corporate Bond", "CORPORATE", 0.075, 10),
-            ("IG_BBB", "BBB Corporate Bond", "CORPORATE", 0.09, 10),
-            # 高收益债
-            ("HY_B", "B Corporate Bond", "CORPORATE", 0.11, 10),
-            ("HY_HY", "HY Corporate Bond", "CORPORATE", 0.14, 10),
-        ]
-        
-        for ticker, name, btype, coupon, maturity in bonds_data:
-            maturity_date = datetime.now() + timedelta(days=maturity*365)
-            # 国债全部为AAA评级
-            if btype == "GOVERNMENT":
-                credit_rating = "AAA"
-            elif "AAA" in ticker:
-                credit_rating = "AAA"
-            elif "AA" in ticker:
-                credit_rating = "AA"
-            elif "A" in ticker:
-                credit_rating = "A"
-            elif "BBB" in ticker:
-                credit_rating = "BBB"
-            elif "BB" in ticker:
-                credit_rating = "BB"
-            elif "B" in ticker:
-                credit_rating = "B"
-            else:
-                credit_rating = "CCC"
-            
+        """初始化债券"""
+        rows = self._load_seed_bonds()
+
+        if rows:
+            for r in rows:
+                f = r.get("fundamentals") or {}
+                ticker = r.get("ticker")
+                if not ticker:
+                    continue
+                industry = r.get("industry") or ""
+                btype = "GOVERNMENT" if "Government" in industry else "CORPORATE"
+                years = float(f.get("maturity_years") or 10)
+                # maturity_years 至少保留一个最短期限，避免 0 期限债券
+                years = max(years, 0.25)
+                try:
+                    bond = Bond(
+                        bond_id=ticker,
+                        ticker=ticker,
+                        name=r.get("name") or ticker,
+                        bond_type=btype,
+                        coupon_rate=float(f.get("coupon") or 0.05),
+                        maturity_date=datetime.now() + timedelta(days=years * 365),
+                        credit_rating=f.get("rating") or "AAA",
+                    )
+                    bond.update(float(f.get("yield") or 0.05))
+                    self.bonds[ticker] = bond
+                except Exception as e:
+                    logger.warning(f"Skip seed bond {ticker}: {e}")
+            if self.bonds:
+                logger.info(f"BondEngine loaded {len(self.bonds)} bonds from seed")
+                return
+
+        # 兜底路径
+        for ticker, name, btype, coupon, maturity, rating in self.FALLBACK_BONDS:
             bond = Bond(
                 bond_id=ticker,
                 ticker=ticker,
                 name=name,
                 bond_type=btype,
                 coupon_rate=coupon,
-                maturity_date=maturity_date,
-                credit_rating=credit_rating
+                maturity_date=datetime.now() + timedelta(days=maturity * 365),
+                credit_rating=rating,
             )
             bond.update(self.yield_curve.get_yield(maturity) + (0.01 if btype == "CORPORATE" else 0))
             self.bonds[ticker] = bond
+        logger.info(f"BondEngine initialized {len(self.bonds)} bonds from builtin list")
     
     def step(self, days: int = 1, shocks: Optional[Dict] = None):
         """推进债券市场"""

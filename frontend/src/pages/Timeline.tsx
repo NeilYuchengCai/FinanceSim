@@ -50,7 +50,7 @@ export default function TimelinePage() {
 
   const fetchEvents = async () => {
     try {
-      const res = await axios.get('/api/events/list', { params: { world_id: 1, limit: 100 } })
+      const res = await axios.get('/api/v1/events/list', { params: { world_id: 1, limit: 100 } })
       setEvents(res.data || [])
     } catch (e) {
       console.error('Failed to fetch events:', e)
@@ -67,7 +67,7 @@ export default function TimelinePage() {
     setSelectedEvent(event)
     if (event.affected_assets.length > 0) {
       try {
-        const res = await axios.get('/api/assets/price-history', {
+        const res = await axios.get('/api/v1/assets/price-history', {
           params: { ticker: event.affected_assets[0], limit: 50 }
         })
         setPriceHistory(res.data || [])

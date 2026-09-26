@@ -1,64 +1,452 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import axios from 'axios'
 import { t } from '../i18n'
 
+const WORLD_ID = 1
+
+// 后端 SimulationSpeed 枚举名，/speed 只接受这四个大写值
+const SPEED_OPTIONS = ['X1', 'X10', 'X100', 'X1000'] as const
+type Speed = typeof SPEED_OPTIONS[number]
+
+// 与设置页共享的持久化 key（Settings.tsx 负责写入，本页面只读不回写，避免两页互相打架）
+const SETTINGS_STORAGE_KEY = 'financesim-settings'
+
+// 读取设置页的「默认速度」；key 不存在 / JSON 损坏 / 字段缺失 / 值非法，一律退化为 X1
+function loadDefaultSpeed(): Speed {
+  try {
+    const raw = localStorage.getItem(SETTINGS_STORAGE_KEY)
+    if (!raw) return 'X1'
+    const parsed = JSON.parse(raw) || {}
+    const value = parsed.defaultSpeed
+    return (SPEED_OPTIONS as readonly string[]).includes(value) ? (value as Speed) : 'X1'
+  } catch {
+    return 'X1'
+  }
+}
+
+// 倍率越高，tick 越密，避免高速下天数跳变过慢
+const TICK_INTERVAL: Record<Speed, number> = {
+  X1: 1000,
+  X10: 1000,
+  X100: 500,
+  X1000: 300,
+}
+
+interface SimStatus {
+  current_day: number
+  current_time: string
+  speed: string
+  is_paused: boolean
+  // 交易日历字段（后端 SimulationClock.get_status() 提供）
+  weekday?: string          // 英文星期几，如 'Monday'
+  is_trading_day?: boolean  // 是否交易日
+  market_status?: string    // OPEN / CLOSED / WEEKEND / HOLIDAY
+  next_trading_day?: string // YYYY-MM-DD
+  holiday_name?: string     // 节假日名称，非节假日为空串
+}
+
+// 市场状态 -> 徽章配色（index.css 里只有 tag-green / tag-red / tag-blue / tag-yellow）
+const MARKET_TAG_CLASS: Record<string, string> = {
+  OPEN: 'tag-green',
+  CLOSED: 'tag-blue',
+  WEEKEND: 'tag-yellow',
+  HOLIDAY: 'tag-red',
+}
+
+// 市场状态的中文说明
+const MARKET_LABEL_CN: Record<string, string> = {
+  OPEN: '交易日 · 开市',
+  CLOSED: '交易日 · 非交易时段',
+  WEEKEND: '周末休市',
+  HOLIDAY: '节假日休市',
+}
+
+// 英文星期几 -> 中文兜底
+const WEEKDAY_CN: Record<string, string> = {
+  Monday: '周一',
+  Tuesday: '周二',
+  Wednesday: '周三',
+  Thursday: '周四',
+  Friday: '周五',
+  Saturday: '周六',
+  Sunday: '周日',
+}
+
+const marketTagClass = (s?: string) => MARKET_TAG_CLASS[s ?? ''] ?? 'tag-blue'
+const marketLabelCn = (s?: string) => MARKET_LABEL_CN[s ?? ''] ?? ''
+const weekdayCn = (w?: string) => (w ? WEEKDAY_CN[w] ?? '' : '')
+
+interface EconomyState {
+  cycle_phase: string
+  cycle_position: number
+  gdp_growth: number
+  inflation: number
+  unemployment: number
+  interest_rate: number
+}
+
+interface WorldEvent {
+  id: string
+  type: string
+  severity: number
+  title: string
+  created_at: string
+}
+
+const pct = (v: number) => `${(v * 100).toFixed(2)}%`
+
+// 模拟时钟返回的是 ISO 串，直接切片展示，不使用浏览器 now()
+function formatSimTime(iso?: string) {
+  if (!iso) return '—'
+  return iso.replace('T', ' ').slice(0, 19)
+}
+
 export default function Simulation() {
-  const [isPlaying, setIsPlaying] = useState(false)
-  const [speed, setSpeed] = useState(1)
-  const [currentDay] = useState(0)
+  const [status, setStatus] = useState<SimStatus | null>(null)
+  const [speed, setSpeed] = useState<Speed>(() => loadDefaultSpeed())
+  const [playing, setPlaying] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const [economy, setEconomy] = useState<EconomyState | null>(null)
+  const [economyError, setEconomyError] = useState<string | null>(null)
+  const [events, setEvents] = useState<WorldEvent[]>([])
+  const [eventsError, setEventsError] = useState<string | null>(null)
+
+  const timerRef = useRef<number | null>(null)
+
+  const refreshStatus = useCallback(async () => {
+    const res = await axios.get(`/api/v1/simulation/${WORLD_ID}/status`)
+    setStatus(res.data)
+    return res.data as SimStatus
+  }, [])
+
+  const loadEconomy = useCallback(async () => {
+    try {
+      const res = await axios.get('/api/v1/economy/state')
+      setEconomy(res.data)
+      setEconomyError(null)
+    } catch {
+      setEconomyError(t('common.dataError', '数据加载失败'))
+    }
+  }, [])
+
+  const loadEvents = useCallback(async () => {
+    try {
+      const res = await axios.get('/api/v1/events/list', {
+        params: { world_id: WORLD_ID, limit: 100 },
+      })
+      setEvents(Array.isArray(res.data) ? res.data : [])
+      setEventsError(null)
+    } catch {
+      setEventsError(t('common.dataError', '数据加载失败'))
+    }
+  }, [])
+
+  // 设置页的「默认速度」优先：与后端当前速度不一致时，初始化时同步一次到后端
+  const applyDefaultSpeed = useCallback(async (backendSpeed?: string) => {
+    const preferred = loadDefaultSpeed()
+    if (backendSpeed === preferred) {
+      setSpeed(preferred)
+      return
+    }
+    try {
+      await axios.post(`/api/v1/simulation/${WORLD_ID}/speed`, null, {
+        params: { speed: preferred },
+      })
+      setSpeed(preferred)
+    } catch {
+      // 同步失败不打断整页：后端速度合法就用后端值，否则保留设置页的值
+      if (typeof backendSpeed === 'string' && (SPEED_OPTIONS as readonly string[]).includes(backendSpeed)) {
+        setSpeed(backendSpeed as Speed)
+      } else {
+        setSpeed(preferred)
+      }
+    }
+  }, [])
+
+  const loadAll = useCallback(async () => {
+    try {
+      const st = await refreshStatus()
+      setPlaying(!!st && !st.is_paused)
+      await applyDefaultSpeed(st?.speed)
+      setError(null)
+    } catch {
+      setError(t('common.dataError', '数据加载失败'))
+    } finally {
+      setLoading(false)
+    }
+    // 宏观与事件独立容错，一处失败不影响整页
+    await Promise.all([loadEconomy(), loadEvents()])
+  }, [refreshStatus, applyDefaultSpeed, loadEconomy, loadEvents])
+
+  useEffect(() => {
+    loadAll()
+  }, [loadAll])
+
+  // 时钟自己不会走：播放期间必须持续调 /tick 推进模拟时间
+  useEffect(() => {
+    if (!playing) return
+    let cancelled = false
+
+    const run = async () => {
+      try {
+        await axios.post(`/api/v1/simulation/${WORLD_ID}/tick`)
+        const res = await axios.get(`/api/v1/simulation/${WORLD_ID}/status`)
+        if (!cancelled) {
+          setStatus(res.data)
+          setError(null)
+        }
+      } catch {
+        if (!cancelled) setError(t('common.dataError', '数据加载失败'))
+      }
+    }
+
+    timerRef.current = window.setInterval(run, TICK_INTERVAL[speed])
+    return () => {
+      cancelled = true
+      if (timerRef.current !== null) {
+        clearInterval(timerRef.current)
+        timerRef.current = null
+      }
+    }
+  }, [playing, speed])
+
+  const togglePlay = async () => {
+    try {
+      if (playing) {
+        await axios.post(`/api/v1/simulation/${WORLD_ID}/pause`)
+        setPlaying(false)
+      } else {
+        await axios.post(`/api/v1/simulation/${WORLD_ID}/start`)
+        setPlaying(true)
+      }
+      await refreshStatus()
+      setError(null)
+    } catch {
+      setError(t('simulation.actionFailed', '操作失败'))
+    }
+  }
+
+  const stepOnce = async () => {
+    try {
+      await axios.post(`/api/v1/simulation/${WORLD_ID}/step`, null, { params: { days: 1 } })
+      await refreshStatus()
+      await Promise.all([loadEconomy(), loadEvents()])
+      setError(null)
+    } catch {
+      setError(t('simulation.actionFailed', '操作失败'))
+    }
+  }
+
+  const changeSpeed = async (next: Speed) => {
+    setSpeed(next)
+    try {
+      await axios.post(`/api/v1/simulation/${WORLD_ID}/speed`, null, { params: { speed: next } })
+      await refreshStatus()
+      setError(null)
+    } catch {
+      setError(t('simulation.actionFailed', '操作失败'))
+    }
+  }
+
+  const header = (
+    <div className="page-header">
+      <h2>{t('simulation.title')}</h2>
+      <p className="subtitle">{t('simulation.subtitle', '控制模拟时钟')}</p>
+    </div>
+  )
+
+  if (loading) {
+    return (
+      <div>
+        {header}
+        <div className="card">
+          <div className="loading" style={{ padding: 40 }}>{t('common.loading', '加载中...')}</div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error && !status) {
+    return (
+      <div>
+        {header}
+        <div className="card">
+          <div className="error" style={{ padding: 40 }}>{error}</div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div>
-      <div className="page-header">
-        <h2>{t('simulation.title')}</h2>
-        <p className="subtitle">{t('simulation.subtitle', '控制模拟时钟')}</p>
-      </div>
+      {header}
 
       <div className="card">
         <div className="card-header">
           <span className="card-title">{t('simulation.controls', '模拟控制')}</span>
-          <span className="badge badge-dot green"></span>
+          <span className={`badge badge-dot ${playing ? 'green' : 'gray'}`}></span>
         </div>
 
-        <div style={{ display: 'flex', gap: 20, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 20, alignItems: 'center', flexWrap: 'wrap' }}>
+          {/* 模拟时间：来自后端 start_time 推进，精确到秒 */}
           <div>
-            <div className="stat-value">{t('overview.day', '第')} {currentDay} {t('overview.day', '天')}</div>
-            <div className="stat-change">{t('simulation.currentDay', '当前日期')}</div>
+            <div className="stat-change">{t('simulation.simTime', '模拟时间')}</div>
+            <div
+              className="stat-value"
+              style={{ fontFamily: 'monospace', fontSize: '1.5rem', letterSpacing: '0.5px' }}
+            >
+              {formatSimTime(status?.current_time)}
+            </div>
+            <div className="stat-change">
+              {status?.weekday
+                ? `${status.weekday}${weekdayCn(status.weekday) ? ` · ${weekdayCn(status.weekday)}` : ''}`
+                : '—'}
+            </div>
+          </div>
+
+          {/* 交易日历状态徽章 */}
+          <div>
+            <div className="stat-change">{t('simulation.marketStatus', '市场状态')}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+              <span className={`tag ${marketTagClass(status?.market_status)}`}>
+                {status?.market_status ?? '—'}
+              </span>
+              <span className="stat-change">{marketLabelCn(status?.market_status)}</span>
+              {status?.holiday_name ? (
+                <span className="tag tag-red">{status.holiday_name}</span>
+              ) : null}
+            </div>
+            <div className="stat-change">
+              {t('simulation.nextTradingDay', '下一个交易日')}: {status?.next_trading_day ?? '—'}
+            </div>
+          </div>
+
+          <div>
+            <div className="stat-value">
+              {t('simulation.dayPrefix', '第')} {status?.current_day ?? 0} {t('overview.day', '天')}
+            </div>
+            <div className="stat-change">
+              {status?.is_trading_day === undefined
+                ? ''
+                : status.is_trading_day
+                  ? t('simulation.tradingDay', '交易日')
+                  : t('simulation.nonTradingDay', '非交易日')}
+            </div>
           </div>
 
           <div style={{ display: 'flex', gap: 10 }}>
-            <button className="btn btn-primary" onClick={() => setIsPlaying(!isPlaying)}>
-              {isPlaying ? t('simulation.pause', '暂停') : t('simulation.play', '播放')}
+            <button className="btn btn-primary" onClick={togglePlay}>
+              {playing ? t('simulation.pause', '暂停') : t('simulation.play', '播放')}
             </button>
-            <button className="btn btn-secondary">{t('simulation.step', '执行一步')}</button>
+            <button className="btn btn-secondary" onClick={stepOnce}>
+              {t('simulation.step', '执行一步')}
+            </button>
           </div>
 
           <div>
             <label>{t('simulation.speed', '速度')}: </label>
-            <select className="input-field" value={speed} onChange={(e) => setSpeed(Number(e.target.value))}>
-              <option value={1}>1x</option>
-              <option value={10}>10x</option>
-              <option value={100}>100x</option>
-              <option value={1000}>1000x</option>
+            <select
+              className="input-field"
+              value={speed}
+              onChange={(e) => changeSpeed(e.target.value as Speed)}
+            >
+              {SPEED_OPTIONS.map((s) => (
+                <option key={s} value={s}>
+                  {s.replace('X', '')}x
+                </option>
+              ))}
             </select>
           </div>
+
+          <div>
+            <div className="stat-change">
+              {playing ? t('simulation.running', '运行中') : t('simulation.paused', '已暂停')}
+            </div>
+          </div>
         </div>
+
+        {error && <div className="error" style={{ padding: 12 }}>{error}</div>}
       </div>
 
       <div className="grid-2">
         <div className="card">
           <div className="card-header">
             <span className="card-title">{t('overview.marketRegime', '市场状态')}</span>
+            {economy && <span className="tag tag-blue">{economy.cycle_phase}</span>}
           </div>
-          <div className="stat-value">CALM</div>
-          <div className="stat-change">{t('simulation.currentState', '当前市场状态')}</div>
+          {economyError ? (
+            <div className="error" style={{ padding: 16 }}>{economyError}</div>
+          ) : economy ? (
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>{t('simulation.metric', '指标')}</th>
+                  <th>{t('markets.price', '数值')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>{t('simulation.cyclePhase', '周期阶段')}</td>
+                  <td>{economy.cycle_phase}</td>
+                </tr>
+                <tr>
+                  <td>{t('simulation.gdpGrowth', 'GDP 增速')}</td>
+                  <td className={economy.gdp_growth >= 0 ? 'positive' : 'negative'}>
+                    {pct(economy.gdp_growth)}
+                  </td>
+                </tr>
+                <tr>
+                  <td>{t('simulation.inflation', '通胀率')}</td>
+                  <td>{pct(economy.inflation)}</td>
+                </tr>
+                <tr>
+                  <td>{t('simulation.unemployment', '失业率')}</td>
+                  <td>{pct(economy.unemployment)}</td>
+                </tr>
+                <tr>
+                  <td>{t('simulation.interestRate', '利率')}</td>
+                  <td>{pct(economy.interest_rate)}</td>
+                </tr>
+              </tbody>
+            </table>
+          ) : (
+            <div className="loading" style={{ padding: 16 }}>{t('common.noData', '暂无数据')}</div>
+          )}
         </div>
 
         <div className="card">
           <div className="card-header">
             <span className="card-title">{t('simulation.todayEvents', '今日事件')}</span>
+            <span className="tag tag-gray">{events.length}</span>
           </div>
-          <div className="stat-value">0</div>
-          <div className="stat-change">{t('simulation.scheduledEvents', '计划事件')}</div>
+          {eventsError ? (
+            <div className="error" style={{ padding: 16 }}>{eventsError}</div>
+          ) : events.length === 0 ? (
+            <div className="loading" style={{ padding: 16 }}>{t('common.noData', '暂无数据')}</div>
+          ) : (
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>{t('simulation.eventTime', '时间')}</th>
+                  <th>{t('simulation.eventTitle', '事件')}</th>
+                  <th>{t('simulation.eventType', '类型')}</th>
+                  <th>{t('simulation.severity', '强度')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {events.slice(0, 5).map((ev) => (
+                  <tr key={ev.id}>
+                    <td>{formatSimTime(ev.created_at).slice(0, 16)}</td>
+                    <td>{ev.title}</td>
+                    <td>{ev.type}</td>
+                    <td>{ev.severity.toFixed(2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
     </div>
