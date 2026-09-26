@@ -1,10 +1,12 @@
-import { useState, useCallback, lazy, Suspense } from 'react'
+import { useState, useCallback, lazy, Suspense, useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom'
 import { useTheme } from './hooks/useTheme'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import CommandPalette from './components/CommandPalette'
+import GlobalClock from './components/GlobalClock'
 import { allLazyRoutes } from './routes'
 import { t, useLanguage } from './i18n'
+import { restoreLatestSave } from './services/saveSystem'
 
 // Loading 组件
 const PageLoader = () => (
@@ -30,6 +32,13 @@ function App() {
 
   const openPalette = useCallback(() => setPaletteOpen(true), [])
   const closePalette = useCallback(() => setPaletteOpen(false), [])
+
+  // 启动时尝试从本地存档恢复世界状态；无存档则保持后端默认（从零开始）
+  useEffect(() => {
+    restoreLatestSave().catch((err) => {
+      console.warn('Failed to restore latest save:', err)
+    })
+  }, [])
 
   // ⌘/Ctrl+K to open search
   useKeyboardShortcuts([
@@ -159,7 +168,7 @@ function App() {
             </button>
           </div>
         </nav>
-        <main className="main-content">
+        <main className="main-content" style={{ paddingRight: 220 }}>
           <Suspense fallback={<PageLoader />}>
             <Routes>
               {Object.entries(routeComponents).map(([path, Component]) => (
@@ -168,6 +177,7 @@ function App() {
             </Routes>
           </Suspense>
         </main>
+        <GlobalClock />
         <CommandPalette isOpen={paletteOpen} onClose={closePalette} />
       </div>
     </Router>

@@ -97,10 +97,13 @@ class _AssetState:
     """单个资产的内存状态。"""
 
     __slots__ = ("asset_id", "ticker", "price", "anchor", "prev_close",
-                 "sigma", "decimals", "last_sent")
+                 "sigma", "decimals", "last_sent", "asset_type", "name", "sector",
+                 "prev_day_close")
 
     def __init__(self, asset_id: int, ticker: str, price: float, anchor: float,
-                 prev_close: float, sigma: float, decimals: int):
+                 prev_close: float, sigma: float, decimals: int,
+                 asset_type: str = "", name: str = "", sector: str = "",
+                 prev_day_close: float = 0.0):
         self.asset_id = asset_id
         self.ticker = ticker
         self.price = price
@@ -109,16 +112,39 @@ class _AssetState:
         self.sigma = sigma
         self.decimals = decimals
         self.last_sent: Optional[float] = None
+        self.asset_type = asset_type
+        self.name = name or ticker
+        self.sector = sector
+        # 上一个模拟交易日收盘（由 record_daily_bar 维护），用于计算"当日涨跌幅"
+        self.prev_day_close = prev_day_close
 
     def change_pct(self, price: float) -> float:
         if self.prev_close and self.prev_close > 0:
             return (price - self.prev_close) / self.prev_close * 100.0
         return 0.0
 
+    def daily_change_pct(self) -> float:
+        """相对上一个模拟交易日收盘的涨跌幅，用于新闻与市场叙事。
+
+        未记录过日K时退化为累计涨跌幅（种子 prev_close），避免新模拟首日新闻出现 0% 静止。
+        """
+        if self.prev_day_close and self.prev_day_close > 0:
+            return (self.price - self.prev_day_close) / self.prev_day_close * 100.0
+        return self.change_pct(self.price)
+
     def to_item(self) -> dict:
         price = round(self.price, self.decimals)
         self.last_sent = price
         return {"t": self.ticker, "p": price, "c": round(self.change_pct(price), 2)}
+
+    def to_full(self) -> dict:
+        """扩展快照：供新闻引擎等需要名称/板块/类型的消费者使用。"""
+        price = round(self.price, self.decimals)
+        return {
+            "t": self.ticker, "p": price, "c": round(self.change_pct(price), 2),
+            "n": self.name, "s": self.sector, "y": self.asset_type,
+            "d": round(self.daily_change_pct(), 2),
+        }
 
 
 class MarketStream:
@@ -175,6 +201,8 @@ class MarketStream:
                         Asset.type,
                         Asset.current_price,
                         Asset.volatility,
+                        Asset.name,
+                        Asset.sector,
                     ).where(Asset.current_price.isnot(None), Asset.current_price > 0)
                 )
             ).all()
@@ -184,9 +212,11 @@ class MarketStream:
             return
 
         prev_closes = await self._load_prev_closes([int(r[0]) for r in rows])
+        # 上一个模拟交易日的收盘（最新一根 K 线的收盘），用于重启后也能算出"当日涨跌幅"
+        last_closes = await self._load_last_closes([int(r[0]) for r in rows])
 
         states: Dict[str, _AssetState] = {}
-        for asset_id, ticker, asset_type, price, volatility in rows:
+        for asset_id, ticker, asset_type, price, volatility, name, sector in rows:
             price = float(price)
             asset_type = (asset_type or "").upper()
             vol = float(volatility) if volatility else 0.0
@@ -210,6 +240,10 @@ class MarketStream:
                 prev_close=prev_close,
                 sigma=sigma,
                 decimals=_decimals_for(asset_type, price),
+                asset_type=asset_type,
+                name=name or ticker,
+                sector=sector or "",
+                prev_day_close=last_closes.get(int(asset_id)) or 0.0,
             )
 
         self._assets = states
@@ -251,6 +285,37 @@ class MarketStream:
             prev = seq.get(2, seq.get(1))
             if prev and prev > 0:
                 out[asset_id] = prev
+        return out
+
+    async def _load_last_closes(self, asset_ids: List[int]) -> Dict[int, float]:
+        """取每个资产最新一根 K 线的收盘价，作为"上一模拟交易日收盘"。
+
+        用于重启后仍能算出有意义的当日涨跌幅（而非退化成累计涨跌幅）。
+        """
+        if not asset_ids:
+            return {}
+        ids = ",".join(str(int(i)) for i in asset_ids)
+        try:
+            async with async_session_factory() as session:
+                rows = (
+                    await session.execute(
+                        text(
+                            "SELECT asset_id, rn, close FROM ("
+                            "  SELECT asset_id, close,"
+                            "         ROW_NUMBER() OVER (PARTITION BY asset_id ORDER BY timestamp DESC) AS rn"
+                            f"  FROM price_history WHERE asset_id IN ({ids})"
+                            ") WHERE rn <= 1"
+                        )
+                    )
+                ).fetchall()
+        except Exception:
+            logger.exception("Failed to load last closes, falling back to zero")
+            return {}
+
+        out: Dict[int, float] = {}
+        for asset_id, rn, close in rows:
+            if close and close > 0:
+                out[int(asset_id)] = float(close)
         return out
 
     # ------------------------------------------------------------ 推进
@@ -327,6 +392,82 @@ class MarketStream:
     def snapshot_items(self) -> List[dict]:
         """全量快照。"""
         return [state.to_item() for state in self._assets.values()]
+
+    def snapshot_full(self) -> List[dict]:
+        """扩展快照：含名称/板块/类型，供新闻引擎等消费。"""
+        return [state.to_full() for state in self._assets.values()]
+
+    async def record_daily_bar(self, day: int, timestamp: datetime) -> int:
+        """把当前内存价格固化为一根日 K 线写入 price_history。
+
+        这样模拟时间跨天推进时，价格历史会持续增长，Analytics 等依赖
+        price_history 的页面就能跟随模拟时间延伸到"当天"，而不是停在种子数据的最后一天。
+
+        open 取上一日收盘(prev_close)，close 取当前实时价，high/low 在两者基础上微展；
+        仅对 EQUITY/ETF/INDEX 写入（与种子脚本的 HISTORY_TYPES 保持一致）。
+        写入前先按 world_day 删除已有 bar，保证重复调用幂等。
+        """
+        from app.database import async_session_factory
+        from sqlalchemy import text as sa_text
+
+        HISTORY_TYPES = ("EQUITY", "ETF", "INDEX")
+        bar_rows = []
+        for st in self._assets.values():
+            atype = (st.asset_type or "").upper()
+            if atype not in HISTORY_TYPES:
+                continue
+            # 开盘取"上一个模拟交易日收盘"，使日K的 open 连续演化而非卡在种子初值
+            open_px = (
+                st.prev_day_close
+                if st.prev_day_close and st.prev_day_close > 0
+                else (st.prev_close if st.prev_close and st.prev_close > 0 else st.price)
+            )
+            close_px = st.price
+            # 当日高低在开收两端外扩一点，制造真实感
+            ext = random.uniform(0.002, 0.015)
+            high_px = max(open_px, close_px) * (1.0 + ext)
+            low_px = min(open_px, close_px) * (1.0 - ext)
+            vol = int(random.uniform(200_000, 8_000_000))
+            bar_rows.append({
+                "asset_id": st.asset_id,
+                "timestamp": timestamp,
+                "open": round(open_px, st.decimals),
+                "high": round(high_px, st.decimals),
+                "low": round(low_px, st.decimals),
+                "close": round(close_px, st.decimals),
+                "volume": vol,
+                "world_day": day,
+            })
+            # 记录本交易日收盘，供下一交易日新闻计算"当日涨跌幅"
+            st.prev_day_close = close_px
+
+        if not bar_rows:
+            return 0
+
+        async with async_session_factory() as session:
+            # 幂等：先清掉同一模拟日已有的 bar
+            await session.execute(
+                sa_text("DELETE FROM price_history WHERE world_day = :day"),
+                {"day": day},
+            )
+            await session.execute(
+                sa_text(
+                    "INSERT INTO price_history "
+                    "(asset_id, timestamp, open, high, low, close, volume, world_day, data_source) "
+                    "VALUES (:asset_id, :timestamp, :open, :high, :low, :close, :volume, :world_day, 'simulated')"
+                ),
+                bar_rows,
+            )
+            await session.commit()
+        return len(bar_rows)
+
+    def set_price(self, ticker: str, price: float) -> bool:
+        """恢复指定资产的价格（用于存档加载）。"""
+        state = self._assets.get(ticker)
+        if state is None:
+            return False
+        state.price = max(float(price), PRICE_FLOOR)
+        return True
 
     def _broadcast(self, payload: dict) -> None:
         for queue in list(self._subscribers):

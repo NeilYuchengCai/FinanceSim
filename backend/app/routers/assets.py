@@ -189,6 +189,30 @@ async def get_asset(
     return asset
 
 
+@router.put("/{ticker}/price")
+async def restore_asset_price(
+    ticker: str,
+    price: float,
+    world_id: int = Query(1),
+    session: AsyncSession = Depends(get_session)
+):
+    """恢复指定资产的当前价格（存档加载用）。"""
+    from app.services.market_stream import get_market_stream
+    stream = get_market_stream()
+    ok = stream.set_price(ticker, price)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Asset not in market stream")
+    # 同步落库，保证后续 persist 不会覆盖
+    result = await session.execute(
+        select(Asset).where(Asset.world_id == world_id, Asset.ticker == ticker)
+    )
+    asset = result.scalar_one_or_none()
+    if asset is not None:
+        asset.current_price = price
+        await session.commit()
+    return {"ticker": ticker, "price": price, "restored": True}
+
+
 @router.get("/{ticker}/history", response_model=List[PriceBar])
 async def get_price_history(
     ticker: str,

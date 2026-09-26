@@ -32,7 +32,7 @@ function useFlashOnChange(value: number | null): Flash {
 
 function flashClass(flash: Flash): string {
   if (!flash) return ''
-  return flash.dir === 'up' ? 'price-flash-up' : 'price-flash-down'
+  return flash.dir === 'up' ? 'price-flash-up-fast' : 'price-flash-down-fast'
 }
 
 function flashKey(flash: Flash): string {

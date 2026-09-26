@@ -62,6 +62,43 @@ class SafeDict(dict):
         return NewsGenerator._default_for(key)
 
 
+def _fmt_price(p: float) -> str:
+    """价格格式化：指数/大盘股不带小数，普通标的带两位小数。"""
+    try:
+        p = float(p)
+    except (TypeError, ValueError):
+        p = 0.0
+    if p >= 1000:
+        return f"${p:,.0f}"
+    return f"${p:,.2f}"
+
+
+def _fmt_pct(c: float) -> str:
+    """带符号的百分比。"""
+    try:
+        c = float(c)
+    except (TypeError, ValueError):
+        c = 0.0
+    return f"{c:+.2f}%"
+
+
+# 板块驱动叙事：把"板块涨跌幅"落地成具体的现实感原因，而非随机填词
+SECTOR_DRIVERS = {
+    "Technology": ["AI demand optimism", "strong cloud earnings", "upbeat analyst commentary", "data-center capex tailwinds"],
+    "Communication Services": ["robust ad revenue", "subscriber gains", "streaming momentum"],
+    "Financials": ["a steeper yield curve", "rate-cut expectations", "resilient net interest margins"],
+    "Healthcare": ["positive trial readouts", "pipeline progress", "a defensive rotation"],
+    "Energy": ["softer crude prices", "OPEC+ supply signals", "weaker demand forecasts"],
+    "Consumer Discretionary": ["upbeat same-store sales", "resilient consumer spending", "easy comparisons"],
+    "Consumer Staples": ["steady demand", "pricing power", "a defensive bid"],
+    "Industrials": ["healthy order books", "reshoring capex", "infrastructure spending"],
+    "Materials": ["firm commodity prices", "China demand hopes", "supply constraints"],
+    "Utilities": ["rate-sensitive flows", "regulated returns", "renewables investment"],
+    "Real Estate": ["lower rate expectations", "lease-rate stabilization"],
+    "Other": ["broad market flows", "positioning adjustments"],
+}
+
+
 class NewsGenerator:
     """新闻生成器"""
     
@@ -210,6 +247,295 @@ class NewsGenerator:
         self.news_items.extend(news_list)
         return news_list
     
+    # ---------------------------------------------------------------- 市场挂钩新闻
+    def generate_market_news(self, snapshot, macro_state: Optional[Dict] = None,
+                             target_date=None) -> List[NewsItem]:
+        """基于真实行情快照 + 真实宏观状态生成"与市场紧密挂钩"的新闻。
+
+        snapshot: market_stream.snapshot_full() 的结果，每项含
+            t ticker / p 现价 / c 累计涨跌幅 / n 名称 / s 板块 / y 类型 / d 当日涨跌幅
+        不再使用固定模版随机填值，而是根据真实波动幅度、板块轮动、宏观读数来组织叙事。
+        """
+        if target_date is None:
+            target_date = datetime.now()
+        # 用模拟日的序数做随机种子：同一天新闻可复现，不同天天然不同（避免随机模版 spam）
+        rng = random.Random(target_date.toordinal())
+
+        news: List[NewsItem] = []
+        equities = [s for s in (snapshot or []) if s.get("y") in ("EQUITY", "ETF")]
+        indices = [s for s in (snapshot or []) if s.get("y") == "INDEX"]
+
+        # 1) 市场整体定调
+        if equities:
+            avg = sum(s.get("d", s.get("c", 0.0)) for s in equities) / max(len(equities), 1)
+            idx_info = indices[0] if indices else None
+            news.append(self._market_headline(avg, idx_info))
+
+        # 2) 板块轮动：领涨 / 领跌板块
+        sector_chg: Dict[str, List[float]] = {}
+        for s in equities:
+            sector_chg.setdefault(s.get("s") or "Other", []).append(s.get("d", s.get("c", 0.0)))
+        sector_avg = {sec: sum(v) / len(v) for sec, v in sector_chg.items()}
+        ranked = sorted(sector_avg.items(), key=lambda kv: kv[1])
+        if ranked:
+            loser = ranked[0]
+            gainer = ranked[-1]
+            if abs(gainer[1]) >= 0.4:
+                news.append(self._sector_headline(gainer[0], gainer[1], up=True, rng=rng))
+            if loser[0] != gainer[0] and abs(loser[1]) >= 0.4:
+                news.append(self._sector_headline(loser[0], loser[1], up=False, rng=rng))
+
+        # 3) 个股异动（按当日涨跌幅取前 N，仅纳入够"新闻级"的波动，避免出现 +0.00% 的尴尬标题）
+        movers = sorted(equities, key=lambda s: abs(s.get("d", s.get("c", 0.0))), reverse=True)
+        added = 0
+        for s in movers:
+            ch = s.get("d", s.get("c", 0.0))
+            if abs(ch) < 0.8:
+                continue
+            if added >= 5:
+                break
+            news.append(self._mover_headline(s, ch, rng))
+            added += 1
+        # 波动不够时不再强行塞一条 +0.00% 的个股标题，由市场定调/板块/事件新闻补足
+
+        # 4) 宏观新闻（真实宏观状态驱动）
+        if macro_state:
+            news.extend(self._macro_news(macro_state))
+
+        # 5) 锚定真实个股的事件新闻（管理层 / 监管 / 并购），只引用真实 ticker
+        news.extend(self._event_news(movers, macro_state, rng))
+
+        # 按重要性排序
+        news.sort(key=lambda x: list(NewsImportance).index(x.importance))
+        for item in news:
+            item.created_at = target_date.replace(hour=9, minute=30, second=0, microsecond=0)
+        self.news_items.extend(news)
+        return news
+
+    def _make(self, headline, body, importance, sentiment, category,
+              affected_assets=None, affected_sectors=None) -> NewsItem:
+        self._news_id_counter += 1
+        return NewsItem(
+            id=f"NEWS-{self._news_id_counter:06d}",
+            headline=headline,
+            body=body,
+            importance=importance,
+            sentiment=sentiment,
+            category=category,
+            affected_assets=affected_assets or [],
+            affected_sectors=affected_sectors or [],
+        )
+
+    def _market_headline(self, avg: float, idx_info) -> NewsItem:
+        a = avg
+        if a > 1.5:
+            mag, imp, sent = "rally as risk appetite returns", NewsImportance.MAJOR, min(a / 3.0, 1.0)
+            if a > 3:
+                imp = NewsImportance.BREAKING
+        elif a > 0.3:
+            mag, imp, sent = "edge higher, led by cyclicals", NewsImportance.MARKET, min(a / 3.0, 0.6)
+        elif a > -0.3:
+            mag, imp, sent = "drift in narrow ranges as investors await catalysts", NewsImportance.MINOR, 0.0
+        elif a > -1.5:
+            mag, imp, sent = "slip as profit-taking sets in", NewsImportance.MARKET, max(a / 3.0, -0.6)
+        else:
+            mag, imp, sent = "sell off on renewed risk aversion", NewsImportance.MAJOR, max(a / 3.0, -1.0)
+            if a < -3:
+                imp = NewsImportance.BREAKING
+        idx_txt = ""
+        if idx_info:
+            idx_pct = idx_info.get("d", idx_info.get("c", 0.0))
+            if abs(idx_pct) < 0.05:
+                idx_txt = f" with the {idx_info.get('n')} little changed"
+            else:
+                idx_txt = f" with the {idx_info.get('n')} {_fmt_pct(idx_pct)}"
+        headline = f"US equities {mag}{idx_txt}"
+        body = (f"Broad benchmarks {mag}{idx_txt}. The session's move leaves the average constituent "
+                f"around {_fmt_pct(a)} on the day, with internals broadly consistent across large caps.")
+        return self._make(headline, body, imp, round(sent, 3), "MARKET")
+
+    def _sector_headline(self, sector: str, chg: float, up: bool, rng: random.Random) -> NewsItem:
+        drivers = SECTOR_DRIVERS.get(sector, SECTOR_DRIVERS["Other"])
+        driver = rng.choice(drivers)
+        pct = _fmt_pct(chg)
+        if up:
+            headline = f"{sector} shares lead the advance, buoyed by {driver} as the group adds {pct}"
+            body = (f"The {sector} complex outperformed, with the group averaging {pct} on the session. "
+                    f"Desks cited {driver} as the principal tailwind behind the move.")
+            sent = min(chg / 3.0, 0.8)
+        else:
+            headline = f"{sector} lags, weighed by {driver} as the group sheds {pct}"
+            body = (f"{sector} names underperformed, the group averaging {pct}. "
+                    f"Strategists pointed to {driver} as the main headwind.")
+            sent = max(chg / 3.0, -0.8)
+        return self._make(headline, body, NewsImportance.MARKET, round(sent, 3), "MARKET",
+                         affected_sectors=[sector])
+
+    def _mover_headline(self, s: dict, chg: float, rng: random.Random) -> NewsItem:
+        name = s.get("n") or s.get("t")
+        ticker = s.get("t")
+        price = _fmt_price(s.get("p"))
+        pct = _fmt_pct(chg)
+        sector = s.get("s") or "Other"
+        drivers = SECTOR_DRIVERS.get(sector, SECTOR_DRIVERS["Other"])
+        driver = rng.choice(drivers)
+        big = abs(chg) >= 3.0
+        if chg >= 0:
+            if big:
+                headline = f"{name} ({ticker}) jumps {pct} to {price} as {driver} fuels an earnings-beat narrative"
+            else:
+                headline = f"{name} ({ticker}) climbs {pct} to {price} on {driver}"
+            body = (f"{name} ({ticker}) advanced {pct} to {price}. "
+                    f"Flows were driven by {driver}; the move extends recent relative strength in the name.")
+            sent = min(chg / 3.0, 1.0)
+            imp = NewsImportance.MAJOR if big else NewsImportance.COMPANY
+        else:
+            if big:
+                headline = f"{name} ({ticker}) tumbles {pct} to {price} as {driver} sparks a guidance-miss rethink"
+            else:
+                headline = f"{name} ({ticker}) slides {pct} to {price} as {driver} pressures the shares"
+            body = (f"{name} ({ticker}) fell {pct} to {price}. "
+                    f"Traders flagged {driver} as the catalyst behind the weakness.")
+            sent = max(chg / 3.0, -1.0)
+            imp = NewsImportance.MAJOR if big else NewsImportance.COMPANY
+        return self._make(headline, body, imp, round(sent, 3), "COMPANY",
+                         affected_assets=[ticker], affected_sectors=[sector])
+
+    def _macro_news(self, macro: Dict) -> List[NewsItem]:
+        out: List[NewsItem] = []
+        inflation = float(macro.get("inflation", 0.02))
+        interest = float(macro.get("interest_rate", 0.05))
+        unemployment = float(macro.get("unemployment", 0.05))
+        gdp = float(macro.get("gdp_growth", 0.025))
+        conf = float(macro.get("consumer_confidence", 1.0))
+        phase = str(macro.get("cycle_phase", "EXPANSION"))
+
+        infl_pct = inflation * 100
+        if infl_pct > 3:
+            out.append(self._make(
+                f"Inflation runs hot at {infl_pct:.1f}%, keeping the Fed on a hawkish path",
+                f"Consumer prices rose {infl_pct:.1f}% year over year, above the central bank's target and "
+                f"reinforcing expectations that policy will stay restrictive for longer.",
+                NewsImportance.MACRO, -0.4, "MACRO"))
+        elif infl_pct > 1.5:
+            out.append(self._make(
+                f"CPI prints at {infl_pct:.1f}%, close to the Fed's target",
+                f"Headline inflation came in at {infl_pct:.1f}%, a reading markets interpreted as consistent "
+                f"with a gradual normalization in price pressures.",
+                NewsImportance.MACRO, 0.1, "MACRO"))
+        elif infl_pct > 0:
+            out.append(self._make(
+                f"Inflation cools to {infl_pct:.1f}%, easing policy pressure",
+                f"Price growth slowed to {infl_pct:.1f}%, giving policymakers more room to support activity.",
+                NewsImportance.MACRO, 0.25, "MACRO"))
+        else:
+            out.append(self._make(
+                f"Deflationary signal as prices fall {abs(infl_pct):.1f}%",
+                f"Consumer prices declined {abs(infl_pct):.1f}% year over year, raising concerns about demand.",
+                NewsImportance.BREAKING, -0.5, "MACRO"))
+
+        rate_pct = interest * 100
+        if phase in ("OVERHEAT", "PEAK"):
+            out.append(self._make(
+                f"Federal Reserve holds the policy rate at {rate_pct:.2f}% amid late-cycle risks",
+                f"The central bank left its benchmark at {rate_pct:.2f}%, signaling caution as the expansion "
+                f"shows signs of maturity.",
+                NewsImportance.MACRO, -0.1, "MACRO"))
+        elif phase in ("CONTRACTION", "STAGNATION"):
+            out.append(self._make(
+                f"Federal Reserve holds the policy rate at {rate_pct:.2f}% as growth softens",
+                f"Policymakers kept rates at {rate_pct:.2f}% while acknowledging a loss of momentum in activity.",
+                NewsImportance.MACRO, 0.0, "MACRO"))
+        else:
+            out.append(self._make(
+                f"Federal Reserve holds the policy rate at {rate_pct:.2f}%",
+                f"The benchmark rate was maintained at {rate_pct:.2f}%, with the committee striking a balanced tone.",
+                NewsImportance.MACRO, 0.05, "MACRO"))
+
+        unemp_pct = unemployment * 100
+        if unemp_pct < 4:
+            out.append(self._make(
+                f"Labor market stays tight with unemployment at {unemp_pct:.1f}%",
+                f"The jobless rate held at {unemp_pct:.1f}%, a level consistent with full employment.",
+                NewsImportance.MACRO, 0.1, "MACRO"))
+        elif unemp_pct > 6:
+            out.append(self._make(
+                f"Labor market softens as unemployment climbs to {unemp_pct:.1f}%",
+                f"The unemployment rate rose to {unemp_pct:.1f}%, the highest in some time and a worry for demand.",
+                NewsImportance.MACRO, -0.3, "MACRO"))
+        else:
+            out.append(self._make(
+                f"Unemployment steady at {unemp_pct:.1f}%",
+                f"The jobless rate was little changed at {unemp_pct:.1f}%, indicating a stable labor backdrop.",
+                NewsImportance.MACRO, 0.0, "MACRO"))
+
+        gdp_pct = gdp * 100
+        phase_word = {
+            "EXPANSION": "broad-based growth",
+            "RECOVERY": "early-cycle rebound",
+            "PEAK": "late-cycle momentum",
+            "CONTRACTION": "slowing activity",
+            "STAGNATION": "stagflation concerns",
+        }.get(phase, "moderate expansion")
+        out.append(self._make(
+            f"Economy expands at {gdp_pct:.1f}% annualized in a {phase_word} environment",
+            f"Output grew {gdp_pct:.1f}% annualized, painting a picture of {phase_word}.",
+            NewsImportance.MARKET, (0.2 if gdp_pct > 0 else -0.4), "MACRO"))
+
+        if conf < 0.85:
+            out.append(self._make(
+                f"Consumer sentiment sours to {conf:.2f}, a warning for spending",
+                f"The confidence index fell to {conf:.2f}, suggesting households are turning more cautious.",
+                NewsImportance.MACRO, -0.2, "MACRO"))
+        elif conf > 1.15:
+            out.append(self._make(
+                f"Consumer confidence strengthens to {conf:.2f}",
+                f"The confidence index rose to {conf:.2f}, underpinning the outlook for consumption.",
+                NewsImportance.MACRO, 0.2, "MACRO"))
+
+        return out[:5]
+
+    def _event_news(self, movers, macro_state=None, rng: random.Random = None) -> List[NewsItem]:
+        out: List[NewsItem] = []
+        if not movers:
+            return out
+        if rng is None:
+            rng = random
+        # 按模拟日种子挑选"主角"，使快进的每一天聚焦不同真实个股，而非千篇一律
+        top = rng.choice(movers)
+        name = top.get("n") or top.get("t")
+        ticker = top.get("t")
+        sector = top.get("s") or "Other"
+        ch = top.get("d", top.get("c", 0.0))
+        direction = "higher" if ch >= 0 else "lower"
+
+        # 管理层变动（锚定真实个股）
+        out.append(self._make(
+            f"{name} names a new CEO as shares trade {direction}",
+            f"{name} ({ticker}) announced a leadership transition. The stock has been trading {direction} "
+            f"ahead of the change, and investors will watch whether capital allocation plans shift.",
+            NewsImportance.COMPANY, (0.1 if ch >= 0 else -0.1), "COMPANY",
+            affected_assets=[ticker], affected_sectors=[sector]))
+
+        # 监管 / 并购（引用同板块另一只真实个股）
+        same_sector = [m for m in movers if (m.get("s") or "Other") == sector and m.get("t") != ticker]
+        if same_sector:
+            other = rng.choice(same_sector)
+            out.append(self._make(
+                f"{name} said to be exploring a combination with {other.get('t')} in the {sector} space",
+                f"People familiar with the matter said {name} ({ticker}) has held preliminary talks with "
+                f"{other.get('t')} ({other.get('n') or other.get('t')}) about a tie-up spanning {sector}.",
+                NewsImportance.MAJOR, 0.2, "COMPANY",
+                affected_assets=[ticker, other.get("t")], affected_sectors=[sector]))
+        else:
+            out.append(self._make(
+                f"Regulators open a review of {name} over competitive practices",
+                f"Authorities confirmed a review of {name} ({ticker}), focusing on competitive conduct. "
+                f"The inquiry adds an overhang for the shares.",
+                NewsImportance.COMPANY, -0.15, "COMPANY",
+                affected_assets=[ticker], affected_sectors=[sector]))
+        return out
+
     def _generate_macro_news(self, state: Dict) -> List[NewsItem]:
         """生成宏观新闻
 
@@ -558,11 +884,25 @@ class NewsEngine:
     def ensure_populated(self, assets: Optional[List[Dict]] = None, macro_state: Optional[Dict] = None) -> None:
         """确保新闻引擎内已有新闻，避免各端点返回空列表。
 
-        各 router 在返回前调用它；新闻为空时按默认资产集播一批。
+        优先用真实行情快照 + 真实宏观状态生成，彻底避免"固定模版随机"的新闻。
+        仅在拿不到行情数据时退回模版生成。
         """
         if self.generator.news_items:
             return
-        
+
+        try:
+            from app.services.market_stream import get_market_stream
+            from app.routers.economy import _economic_engine
+            stream = get_market_stream()
+            snapshot = stream.snapshot_full() if stream else []
+            macro = _economic_engine.get_macro_data() if _economic_engine is not None else None
+            if snapshot:
+                self.generator.generate_market_news(snapshot, macro)
+                return
+        except Exception as e:
+            logger.warning(f"Market-linked ensure_populated failed, falling back to template: {e}")
+
+        # 兜底：无行情数据时退回模版生成
         if assets is None:
             assets = [
                 {"ticker": t, "name": t, "sector": s}
@@ -581,11 +921,22 @@ class NewsEngine:
                 "interest_rate": 0.05,
             }
         self.generate_daily_news(assets, macro_state)
-    
+
     def generate_daily_news(self, assets: List[Dict], macro_state: Optional[Dict] = None) -> List[Dict]:
-        """生成每日新闻"""
+        """生成每日新闻（模版版，供测试端点 /generate 使用）"""
         news_list = self.generator.generate_news(assets, macro_state)
         logger.info(f"Generated {len(news_list)} news items")
+        return [n.to_dict() for n in news_list]
+
+    def generate_for_date(self, target_date: datetime, snapshot: List[Dict],
+                          macro_state: Optional[Dict] = None) -> List[Dict]:
+        """为指定模拟日期生成与市场挂钩的新闻。
+
+        snapshot 来自 market_stream.snapshot_full()（真实行情），macro_state 来自经济引擎。
+        新闻时间戳固定为该模拟日 09:30，使其按模拟时间排序而非真实时间。
+        """
+        news_list = self.generator.generate_market_news(snapshot, macro_state, target_date)
+        logger.info(f"Generated {len(news_list)} market-linked news items for {target_date.date()}")
         return [n.to_dict() for n in news_list]
     
     def get_headlines(self, limit: int = 20) -> List[Dict]:

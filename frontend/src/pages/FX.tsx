@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import axios from 'axios'
 import { t } from '../i18n'
+import { usePriceStream } from '../hooks/usePriceStream'
 
 interface FXPair {
   ticker: string
@@ -14,10 +15,16 @@ interface FXPair {
   low_24h: number
 }
 
+// 外汇对ticker映射到统一的WS ticker格式 (EUR/USD -> EURUSD)
+function normalizeTicker(ticker: string): string {
+  return ticker.replace('/', '')
+}
+
 export default function FX() {
   const [pairs, setPairs] = useState<FXPair[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const { prices, connected } = usePriceStream()
 
   useEffect(() => {
     const fetchFX = async () => {
@@ -25,7 +32,7 @@ export default function FX() {
         const res = await axios.get('/api/v1/fx/pairs')
         setPairs(res.data)
       } catch (err) {
-        setError(t('common.dataError'))
+        setError(t('common.dataError', '数据加载失败'))
       } finally {
         setLoading(false)
       }
@@ -37,6 +44,8 @@ export default function FX() {
     const sign = change >= 0 ? '+' : ''
     return `${sign}${change.toFixed(3)}%`
   }
+
+  const formatPrice = (price: number) => price.toFixed(4)
 
   if (loading) {
     return (
@@ -66,25 +75,39 @@ export default function FX() {
     <div>
       <div className="page-header">
         <h2>{t('fx.title')}</h2>
-        <p className="subtitle">{t('fx.subtitle', '货币对实时汇率')}</p>
+        <p className="subtitle">
+          {t('fx.subtitle', '货币对实时汇率')} · {pairs.length} pairs
+          <span style={{ marginLeft: 16, fontSize: 12, color: connected ? 'var(--accent-green)' : 'var(--accent-red)' }}>
+            ● {connected ? t('common.live', '实时') : t('common.connecting', '连接中...')}
+          </span>
+        </p>
       </div>
 
       <div className="grid-3">
-        {pairs.map(pair => (
-          <div key={pair.ticker} className="card">
-            <div className="card-header">
-              <span className="card-title">{pair.ticker}</span>
-              <span className={`badge badge-dot ${pair.change_24h >= 0 ? 'green' : 'red'}`}></span>
+        {pairs.map(pair => {
+          const wsTicker = normalizeTicker(pair.ticker)
+          const quote = prices.get(wsTicker)
+          const displayPrice = quote ? quote.price : pair.price
+          const displayChange = quote ? quote.changePct : pair.change_24h
+
+          return (
+            <div key={pair.ticker} className="card" style={{ borderLeft: `3px solid ${displayChange >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'}` }}>
+              <div className="card-header">
+                <span className="card-title">{pair.ticker}</span>
+                <span className={`badge badge-dot ${displayChange >= 0 ? 'green' : 'red'}`}></span>
+              </div>
+              <div className="stat-value" style={{ fontFamily: 'monospace' }}>
+                {formatPrice(displayPrice)}
+              </div>
+              <div className={`stat-change ${displayChange >= 0 ? 'positive' : 'negative'}`}>
+                {formatChange(displayChange)}
+              </div>
+              <div className="stat-change" style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+                Spread: {pair.spread.toFixed(1)} pips | Vol: {(pair.volatility * 100).toFixed(2)}%
+              </div>
             </div>
-            <div className="stat-value">{pair.price.toFixed(4)}</div>
-            <div className={`stat-change ${pair.change_24h >= 0 ? 'positive' : 'negative'}`}>
-              {formatChange(pair.change_24h)}
-            </div>
-            <div className="stat-change">
-              Spread: {pair.spread.toFixed(1)} pips | Vol: {(pair.volatility * 100).toFixed(2)}%
-            </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
 
       <div className="card" style={{ marginTop: 20 }}>
@@ -106,20 +129,27 @@ export default function FX() {
             </tr>
           </thead>
           <tbody>
-            {pairs.map(pair => (
-              <tr key={pair.ticker}>
-                <td>{pair.ticker}</td>
-                <td>{pair.base}</td>
-                <td>{pair.quote}</td>
-                <td>{pair.price.toFixed(4)}</td>
-                <td className={pair.change_24h >= 0 ? 'positive' : 'negative'}>
-                  {formatChange(pair.change_24h)}
-                </td>
-                <td>{pair.spread.toFixed(1)}</td>
-                <td>{pair.high_24h.toFixed(4)}</td>
-                <td>{pair.low_24h.toFixed(4)}</td>
-              </tr>
-            ))}
+            {pairs.map(pair => {
+              const wsTicker = normalizeTicker(pair.ticker)
+              const quote = prices.get(wsTicker)
+              const displayPrice = quote ? quote.price : pair.price
+              const displayChange = quote ? quote.changePct : pair.change_24h
+
+              return (
+                <tr key={pair.ticker}>
+                  <td>{pair.ticker}</td>
+                  <td>{pair.base}</td>
+                  <td>{pair.quote}</td>
+                  <td style={{ fontFamily: 'monospace' }}>{formatPrice(displayPrice)}</td>
+                  <td className={displayChange >= 0 ? 'positive' : 'negative'}>
+                    {formatChange(displayChange)}
+                  </td>
+                  <td>{pair.spread.toFixed(1)}</td>
+                  <td>{pair.high_24h.toFixed(4)}</td>
+                  <td>{pair.low_24h.toFixed(4)}</td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
