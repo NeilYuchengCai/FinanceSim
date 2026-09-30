@@ -5,12 +5,12 @@ FinanceSim Event Router
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 
 from app.database import get_session
 from app.models import Event, News
 from app.schemas import EventCreate, NewsResponse
-from app.engines.event_engine import EventGenerator, EventPropagation
+from app.engines.event_engine import EventGenerator, EventPropagation, Event as SimEvent
 
 router = APIRouter(prefix="/events", tags=["events"])
 
@@ -59,7 +59,7 @@ async def list_events(
     )
     
     if event_type:
-        query = query.where(Event.type == event_type.upper())
+        query = query.where(func.lower(Event.type) == event_type.lower())
     
     query = query.limit(limit)
     result = await session.execute(query)
@@ -146,3 +146,24 @@ async def get_propagation_summary(
         return []
     
     return _event_propagation.get_propagation_summary(limit)
+
+
+async def persist_event(world_id: int, ev: SimEvent, session: AsyncSession) -> None:
+    """把一个由 EventGenerator 产生的内存事件落库到 events 表。"""
+    from app.models import Event as DBEvent
+    db_event = DBEvent(
+        id=ev.id,
+        world_id=world_id,
+        type=ev.type,
+        severity=ev.severity,
+        title=ev.title,
+        body=ev.body,
+        affected_assets=ev.affected_assets,
+        affected_sectors=ev.affected_sectors,
+        macro_effect=ev.macro_effect,
+        sentiment_effect=ev.sentiment_effect,
+        duration_days=ev.duration_days,
+        created_at=ev.created_at,
+    )
+    session.add(db_event)
+    await session.commit()

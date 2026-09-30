@@ -2,7 +2,8 @@
 FinanceSim Bot Router
 Bot 交易员 API
 """
-from typing import List, Optional
+import random
+from typing import Dict, List, Optional
 from fastapi import APIRouter, Query, Body
 from pydantic import BaseModel
 
@@ -59,15 +60,43 @@ async def remove_bot(name: str):
 
 @router.post("/step")
 async def step_bots(
-    trading_engine_ref: str = Query("main"),
-    tickers: List[str] = Query(["AAPL", "GOOGL", "MSFT"]),
-    market_data: dict = Body({})
+    world_id: int = Query(1),
+    tickers: List[str] = Query(default_factory=lambda: ["AAPL", "GOOGL", "MSFT", "TSLA", "AMZN", "NVDA", "JPM", "XOM"])
 ):
     if not _bot_engine:
         return {"error": "Bot engine not initialized"}
-    
-    trades = _bot_engine.step(None, tickers, market_data)
+    trades = run_bots_for_world(world_id, tickers)
     return {"trades": len(trades), "recent_trades": trades[-10:]}
+
+
+def run_bots_for_world(world_id: int, tickers: Optional[List[str]] = None) -> List[Dict]:
+    """用真实交易引擎 + 实时行情驱动 AI 交易员，返回本次成交。"""
+    if not _bot_engine:
+        return []
+    from app.routers.trading import get_trading_engine
+    from app.services.market_stream import get_market_stream
+
+    trading_engine = get_trading_engine(world_id)
+    stream = get_market_stream()
+    market_data: Dict[str, Dict] = {}
+    if stream is not None:
+        for st in stream.snapshot_full():
+            market_data[st["t"]] = {"price": st["p"]}
+
+    # 注入真实宏观状态，供 macro 策略决策（缺失时退化为空字典不影响其他策略）
+    try:
+        from app.routers.economy import _economic_engine
+        if _economic_engine is not None:
+            market_data["macro"] = _economic_engine.get_macro_data()
+    except Exception:
+        pass
+
+    if not tickers:
+        all_t = list(market_data.keys())
+        random.shuffle(all_t)
+        tickers = all_t[:40]
+
+    return _bot_engine.step(trading_engine, tickers, market_data)
 
 
 @router.get("/trades")

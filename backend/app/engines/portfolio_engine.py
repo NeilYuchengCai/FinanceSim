@@ -170,13 +170,29 @@ class PortfolioEngine:
         return [self.get_position(t) for t in self.positions.keys()]
     
     def net_worth(self, prices: Dict[str, float] = None) -> float:
-        """计算净值"""
+        """计算净值。
+
+        未提供价格表时，尝试从实时行情流拉取最新价，使净值随行情实时波动；
+        行情流不可用（如离线/测试）时退化为使用持仓 last_price，绝不崩溃。
+        """
+        live_prices: Optional[Dict[str, float]] = prices
+        if live_prices is None:
+            try:
+                from app.services.market_stream import get_market_stream
+                stream = get_market_stream()
+                if stream is not None and getattr(stream, "_assets", None):
+                    live_prices = {item["t"]: item["p"] for item in stream.snapshot_full()}
+            except Exception:  # pragma: no cover - 行情流不可用时的兜底
+                logger.debug("net_worth: live price stream unavailable, using last_price")
+                live_prices = None
+
         equity_value = Decimal("0")
         for ticker, pos in self.positions.items():
-            price = Decimal(str(prices.get(ticker, pos.last_price)))
+            px = live_prices.get(ticker, pos.last_price) if live_prices else pos.last_price
+            price = Decimal(str(px))
             pos.update_price(price)
             equity_value += pos.market_value
-        
+
         return float(self.cash + equity_value)
     
     def get_performance(self) -> Dict:

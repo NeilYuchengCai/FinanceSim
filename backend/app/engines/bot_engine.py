@@ -54,6 +54,9 @@ class BotEngine:
     def __init__(self):
         self.bots: Dict[str, BotState] = {}
         self.trade_log: List[Dict] = []
+        # 引擎自己维护的滚动价格历史：行情流只给当前价，策略需要的"窗口"
+        # 由这里逐 tick 累积，几个 sim-day 后即可驱动动量/均值回归等策略。
+        self.price_history: Dict[str, List[float]] = {}
     
     def add_bot(self, config: BotConfig) -> BotState:
         """添加一个新的 Bot"""
@@ -77,28 +80,61 @@ class BotEngine:
         执行一步交易
         Returns: 本次交易的列表
         """
+        # 累积滚动价格历史（行情流只给当前价，策略窗口由这里逐 tick 累积）
+        for tk, md in market_data.items():
+            if tk == "macro":
+                continue
+            px = md.get("price") if isinstance(md, dict) else None
+            if px is None:
+                continue
+            hist = self.price_history.setdefault(tk, [])
+            hist.append(float(px))
+            if len(hist) > 60:
+                del hist[: len(hist) - 60]
+
         all_trades = []
-        
+
         for name, bot in self.bots.items():
             trades = self._execute_bot_trade(bot, trading_engine, tickers, market_data)
             all_trades.extend(trades)
-        
+
         self.trade_log.extend(all_trades[-100:])  # 保留最近100条
         return all_trades
     
-    def _execute_bot_trade(self, bot: BotState, trading_engine: TradingEngine, 
+    def _execute_bot_trade(self, bot: BotState, trading_engine: TradingEngine,
                           tickers: List[str], market_data: Dict) -> List[Dict]:
         """执行单个 Bot 的交易决策"""
         trades = []
         ticker = random.choice(tickers) if tickers else "AAPL"
-        
+
         try:
-            # 获取当前价格
-            current_price = market_data.get(ticker, {}).get("price", 100.0)
-            
+            # 用引擎维护的滚动历史构造该标的的行情视图，使动量/均值回归等
+            # 依赖窗口的策略在本步即可拿到真实历史，而非仅 1 个点的"伪历史"。
+            hist = self.price_history.get(ticker, [])
+            md = dict(market_data.get(ticker, {}))
+            md["history"] = [{"price": p} for p in hist]
+            current_price = md.get("price")
+            if current_price is None:
+                current_price = hist[-1] if hist else 100.0
+                md["price"] = current_price
+            # 让 _decide_action 内部按 ticker 取到带历史的视图
+            enriched = dict(market_data)
+            enriched[ticker] = md
+
             # 根据策略决定买卖
-            decision = self._decide_action(bot, ticker, current_price, market_data)
-            
+            decision = self._decide_action(bot, ticker, current_price, enriched)
+
+            # 闲置兜底：若策略无明确信号且账户有余钱、该标的无持仓，
+            # 按风险偏好概率建仓，保证 AI 交易员始终有市场活动（而非永远 HOLD）。
+            if decision.get("action") == "HOLD" and bot.cash > 2000 \
+                    and bot.positions.get(ticker, 0) == 0:
+                if random.random() < bot.config.risk_tolerance:
+                    qty = min(bot.config.max_position_size, bot.cash / current_price * 0.05)
+                    decision = {
+                        "action": "BUY",
+                        "quantity": max(bot.config.min_trade_size, qty),
+                    }
+
             if decision["action"] == "BUY":
                 trade = trading_engine.submit_order(
                     ticker=ticker,
@@ -202,32 +238,30 @@ class BotEngine:
     
     def _market_making_strategy(self, bot: BotState, ticker: str, price: float,
                                 market_data: Dict) -> Dict:
-        """做市策略"""
-        trades = []
-        
-        # 卖出单
-        if bot.cash > 1000:
+        """做市策略：先建库存（有现金无持仓时买入），有库存后围绕价差双向报价。"""
+        # 已有库存 -> 在上方挂卖单
+        if bot.positions.get(ticker, 0) > 0:
             sell_price = price * (1 + bot.config.spread_capture)
-            quantity = min(50, bot.cash / sell_price * 0.05)
-            trades.append({
+            quantity = min(50, bot.positions.get(ticker, 0) * 0.1)
+            return {
                 "action": "SELL",
                 "ticker": ticker,
                 "quantity": max(bot.config.min_trade_size, quantity),
-                "price": sell_price
-            })
-        
-        # 买入单
-        if bot.positions.get(ticker, 0) > 0:
+                "price": sell_price,
+            }
+
+        # 无库存且有现金 -> 先买入建库存
+        if bot.cash > 1000:
             buy_price = price * (1 - bot.config.spread_capture)
-            quantity = min(50, bot.positions.get(ticker, 0) * 0.1)
-            trades.append({
+            quantity = min(50, bot.cash / max(buy_price, 1e-6) * 0.02)
+            return {
                 "action": "BUY",
                 "ticker": ticker,
                 "quantity": max(bot.config.min_trade_size, quantity),
-                "price": buy_price
-            })
-        
-        return trades[0] if trades else {"action": "HOLD", "quantity": 0}
+                "price": buy_price,
+            }
+
+        return {"action": "HOLD", "quantity": 0}
     
     def _random_strategy(self, bot: BotState, ticker: str, price: float) -> Dict:
         """随机策略"""
@@ -336,15 +370,23 @@ class BotEngine:
         return {"action": "HOLD", "quantity": 0}
     
     def get_stats(self) -> Dict:
-        """获取所有 Bot 统计"""
+        """获取所有 Bot 统计（含实时盈亏与风险偏好，供前端展示）"""
+        from app.services.market_stream import get_market_stream
+        stream = get_market_stream()
+        prices = {t: st.price for t, st in stream._assets.items()} if stream else {}
+
         stats = []
         for name, bot in self.bots.items():
+            pos_value = sum(q * prices.get(t, 0.0) for t, q in bot.positions.items())
+            pnl = bot.cash + pos_value - bot.config.capital
             stats.append({
                 "name": name,
                 "strategy": bot.config.strategy,
                 "cash": bot.cash,
                 "positions": bot.positions,
                 "total_trades": bot.total_trades,
+                "total_pnl": pnl,
+                "risk_tolerance": bot.config.risk_tolerance,
                 "last_update": bot.last_update.isoformat()
             })
         return {"bots": stats, "total": len(stats)}

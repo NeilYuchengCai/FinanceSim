@@ -3,6 +3,7 @@ FinanceSim Simulation Router
 模拟控制 API
 """
 import logging
+import random
 from datetime import datetime, timedelta
 from typing import Dict
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -11,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_session
 from app.models import World
 from app.engines.simulation_engine import SimulationClock, SimulationSpeed
+from app.services.market_stream import get_market_stream
 
 logger = logging.getLogger(__name__)
 
@@ -107,48 +109,9 @@ async def tick(world_id: int, session: AsyncSession = Depends(get_session)):
     new_day = clock.tick()
     await persist_day(world_id, clock.current_day, session)
 
-    # 进入新的一天时：推进宏观 -> 生成与市场挂钩的新闻 -> 固化日K
+    # 进入新的一天时：推进宏观 -> AI 交易 -> 生成事件(落库+冲击) -> 新闻 -> 固化日K
     if new_day:
-        # 1) 推进宏观经济 1 天，使新闻叙事与真实宏观状态挂钩
-        try:
-            from app.routers.economy import _economic_engine
-            if _economic_engine is not None:
-                _economic_engine.step(1)
-        except Exception as e:
-            logger.error(f"macro step failed: {e}")
-
-        # 2) 基于真实行情快照 + 宏观状态生成"与市场挂钩"的新闻
-        from app.routers.news import _news_engine
-        if _news_engine is not None:
-            try:
-                target_date = clock.current_time
-                snapshot = []
-                macro_state = None
-                try:
-                    from app.services.market_stream import get_market_stream
-                    stream = get_market_stream()
-                    if stream is not None:
-                        snapshot = stream.snapshot_full()
-                except Exception:
-                    pass
-                try:
-                    from app.routers.economy import _economic_engine
-                    if _economic_engine is not None:
-                        macro_state = _economic_engine.get_macro_data()
-                except Exception:
-                    pass
-                _news_engine.generate_for_date(target_date, snapshot, macro_state)
-            except Exception as e:
-                logger.error(f"Daily news generation failed: {e}")
-
-        # 3) 把当前内存价格固化为日K，使 Analytics 跟随模拟时间延伸
-        try:
-            from app.services.market_stream import get_market_stream
-            stream = get_market_stream()
-            if stream is not None:
-                await stream.record_daily_bar(clock.current_day, clock.current_time)
-        except Exception as e:
-            logger.error(f"record_daily_bar failed: {e}")
+        await _run_daily_generators(world_id, session, clock.current_day, clock.current_time)
 
     return {
         "current_day": clock.current_day,
@@ -164,54 +127,89 @@ async def step(world_id: int, days: int = 1, session: AsyncSession = Depends(get
     new_day = clock.step(days)
     await persist_day(world_id, new_day, session)
 
-    # 步进期间跨越的每一天都补：推进宏观 -> 生成与市场挂钩的新闻 -> 固化日K
-    from app.routers.news import _news_engine
-    if _news_engine is not None:
-        from app.services.market_stream import get_market_stream
-        stream = get_market_stream()
-        for d in range(old_day + 1, new_day + 1):
-            try:
-                day_date = (clock.start_time + timedelta(days=d)).date()
-                day_dt = datetime.combine(day_date, datetime.min.time())
-
-                # 推进宏观 1 天
-                try:
-                    from app.routers.economy import _economic_engine
-                    if _economic_engine is not None:
-                        _economic_engine.step(1)
-                except Exception as e:
-                    logger.error(f"macro step failed on day {d}: {e}")
-
-                # 推进真实行情：快进不经过实时 tick 循环，这里手动推进若干 tick 让价格真实演化，
-                # 使当日新闻有真实涨跌幅、Analytics 蜡烛有实体（而非停留在 Flat 的水平线）
-                if stream is not None:
-                    for _ in range(500):
-                        try:
-                            stream.advance()
-                        except Exception:
-                            break
-
-                # 基于真实行情 + 宏观生成当日新闻
-                snapshot = stream.snapshot_full() if stream else []
-                macro_state = None
-                try:
-                    from app.routers.economy import _economic_engine
-                    if _economic_engine is not None:
-                        macro_state = _economic_engine.get_macro_data()
-                except Exception:
-                    pass
-                _news_engine.generate_for_date(day_dt, snapshot, macro_state)
-
-                # 固化日K，使 Analytics 延伸到当日
-                if stream is not None:
+    stream = get_market_stream()
+    for d in range(old_day + 1, new_day + 1):
+        try:
+            day_date = (clock.start_time + timedelta(days=d)).date()
+            day_dt = datetime.combine(day_date, datetime.min.time())
+            # 快进不经过实时 tick 循环，这里手动推进若干 tick 让价格真实演化
+            if stream is not None:
+                for _ in range(500):
                     try:
-                        await stream.record_daily_bar(d, day_dt)
-                    except Exception as e:
-                        logger.error(f"record_daily_bar failed on day {d}: {e}")
-            except Exception as e:
-                logger.error(f"News generation for step day {d} failed: {e}")
+                        stream.advance()
+                    except Exception:
+                        break
+            await _run_daily_generators(world_id, session, d, day_dt)
+        except Exception as e:
+            logger.error(f"Daily updates for step day {d} failed: {e}")
 
     return {"current_day": new_day}
+
+
+async def _run_daily_generators(world_id: int, session: AsyncSession, day: int, day_dt: datetime) -> None:
+    """推进一天的世界演化：宏观 -> AI 交易 -> 事件(落库+价格冲击) -> 新闻 -> 固化日K。"""
+    # 1) 推进宏观经济 1 天
+    try:
+        from app.routers.economy import _economic_engine
+        if _economic_engine is not None:
+            _economic_engine.step(1)
+    except Exception as e:
+        logger.error(f"macro step failed: {e}")
+
+    # 2) AI 交易员自动交易（真实引擎 + 实时行情），制造市场活动
+    try:
+        from app.routers.bot import run_bots_for_world
+        run_bots_for_world(world_id)
+    except Exception as e:
+        logger.error(f"bot step failed: {e}")
+
+    # 3) 生成与市场挂钩的事件，持久化并施加价格冲击
+    try:
+        from app.routers.events import _event_generator, _event_propagation, persist_event
+        stream = get_market_stream()
+        assets = []
+        if stream is not None:
+            assets = [{"ticker": s["t"], "sector": s.get("s") or "Unknown"} for s in stream.snapshot_full()]
+        if _event_generator is not None and assets and random.random() < 0.7:
+            ev = _event_generator.generate_event(assets, list({a["sector"] for a in assets}))
+            await persist_event(world_id, ev, session)
+            if _event_propagation is not None and stream is not None:
+                for imp in _event_propagation.propagate(ev, assets):
+                    tk = imp.get("ticker")
+                    if tk and tk != "MACRO":
+                        stream.apply_shock(tk, float(imp.get("impact", 0.0)) * 0.12)
+    except Exception as e:
+        logger.error(f"event generation failed: {e}")
+
+    # 4) 基于真实行情 + 宏观生成当日新闻
+    try:
+        from app.routers.news import _news_engine
+        if _news_engine is not None:
+            snapshot = []
+            macro_state = None
+            try:
+                stream = get_market_stream()
+                if stream is not None:
+                    snapshot = stream.snapshot_full()
+            except Exception:
+                pass
+            try:
+                from app.routers.economy import _economic_engine
+                if _economic_engine is not None:
+                    macro_state = _economic_engine.get_macro_data()
+            except Exception:
+                pass
+            _news_engine.generate_for_date(day_dt, snapshot, macro_state)
+    except Exception as e:
+        logger.error(f"Daily news generation failed: {e}")
+
+    # 5) 固化日K，使 Analytics 跟随模拟时间延伸
+    try:
+        stream = get_market_stream()
+        if stream is not None:
+            await stream.record_daily_bar(day, day_dt)
+    except Exception as e:
+        logger.error(f"record_daily_bar failed: {e}")
 
 
 @router.post("/{world_id}/reset")

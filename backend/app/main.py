@@ -70,6 +70,20 @@ async def lifespan(app: FastAPI):
     bot.init_bot_engine(_bot_engine)
     logger.info("Bot Engine initialized")
 
+    # 预置几个默认 AI 交易员，让市场一开始就有人工智能活动
+    try:
+        from app.engines import BotConfig
+        for cfg in [
+            BotConfig(name="Momentum-1", strategy="momentum", capital=100000.0, risk_tolerance=0.6),
+            BotConfig(name="MeanRev-1", strategy="mean_reversion", capital=100000.0, risk_tolerance=0.4),
+            BotConfig(name="MarketMaker-1", strategy="market_making", capital=200000.0, risk_tolerance=0.3),
+            BotConfig(name="Macro-1", strategy="macro", capital=150000.0, risk_tolerance=0.5),
+        ]:
+            _bot_engine.add_bot(cfg)
+        logger.info("Seeded %d default bots", len(_bot_engine.bots))
+    except Exception as e:
+        logger.warning(f"Failed to seed default bots: {e}")
+
     # 初始化事件引擎
     logger.info("Initializing Event Engine...")
     _event_generator = EventGenerator(1)

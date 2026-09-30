@@ -469,6 +469,17 @@ class MarketStream:
         state.price = max(float(price), PRICE_FLOOR)
         return True
 
+    def apply_shock(self, ticker: str, pct: float) -> None:
+        """对指定资产施加一次性价格冲击（事件影响），pct 为小数（如 -0.05 表示 -5%）。
+
+        用于把"市场事件"真实反映到行情上，使时间线与价格走势紧密联动。
+        """
+        state = self._assets.get(ticker)
+        if state is None or not pct:
+            return
+        new_price = max(state.price * (1.0 + float(pct)), PRICE_FLOOR)
+        state.price = new_price
+
     def _broadcast(self, payload: dict) -> None:
         for queue in list(self._subscribers):
             if queue.full():

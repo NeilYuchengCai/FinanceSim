@@ -61,6 +61,8 @@ export default function TimelinePage() {
 
   useEffect(() => {
     fetchEvents()
+    const id = setInterval(fetchEvents, 3000)
+    return () => clearInterval(id)
   }, [])
 
   const handleEventClick = async (event: Event) => {

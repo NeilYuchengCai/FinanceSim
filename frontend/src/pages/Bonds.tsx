@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
 import { t } from '../i18n'
+import { usePriceStream } from '../hooks/usePriceStream'
 
 interface Bond {
   bond_id: string
@@ -25,6 +26,7 @@ export default function Bonds() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState('ALL')
+  const { prices, connected } = usePriceStream()
 
   useEffect(() => {
     const fetchBonds = async () => {
@@ -74,7 +76,12 @@ export default function Bonds() {
     <div>
       <div className="page-header">
         <h2>{t('bonds.title')}</h2>
-        <p className="subtitle">{t('bonds.subtitle', '国债和企业债')} · {bonds.length} bonds</p>
+        <p className="subtitle">
+          {t('bonds.subtitle', '国债和企业债')} · {bonds.length} bonds
+          <span style={{ marginLeft: 16, fontSize: 12, color: connected ? 'var(--accent-green)' : 'var(--accent-red)' }}>
+            ● {connected ? t('common.live', '实时') : t('common.connecting', '连接中...')}
+          </span>
+        </p>
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
@@ -146,7 +153,18 @@ export default function Bonds() {
                   </span>
                 </td>
                 <td>{formatYield(bond.coupon_rate)}</td>
-                <td>{bond.price.toFixed(2)}</td>
+                <td>
+                  {(() => {
+                    const live = prices.get(bond.ticker)
+                    const dp = live ? live.price : bond.price
+                    const ch = live ? live.changePct : 0
+                    return (
+                      <span style={{ color: ch >= 0 ? 'var(--accent-green)' : 'var(--accent-red)', fontFamily: 'monospace' }}>
+                        {dp.toFixed(2)}
+                      </span>
+                    )
+                  })()}
+                </td>
                 <td className="positive">{formatYield(bond.yield_to_maturity)}</td>
                 <td>{bond.duration.toFixed(1)}</td>
                 <td>{formatDate(bond.maturity_date)}</td>

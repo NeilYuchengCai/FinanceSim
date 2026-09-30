@@ -66,9 +66,38 @@ class TradingEngine:
                 order.type = "MARKET" if order_type == "STOP" else "LIMIT"
                 order.price = order.stop_price
         
-        trades = orderbook.add_order(order)
+        try:
+            trades = orderbook.add_order(order)
+        except ValueError:
+            # 没有对手盘（例如孤立的市价单）：先当作无成交，下面用流动性兜底处理
+            trades = []
         self.pending_orders[order_id] = order
-        
+
+        # 流动性兜底：市价单若没有对手盘，按当前市场价直接成交，
+        # 保证用户与 AI 交易员都能随时成交（模拟环境无需挂单等待）。
+        if order_type == "MARKET" and order.remaining > 0:
+            mid = self._get_market_price(ticker)
+            if mid and mid > 0:
+                qty = order.remaining
+                fill = Decimal(str(round(float(mid), 2)))
+                if order.side == "BUY":
+                    fill = (fill * Decimal("1.0005")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+                else:
+                    fill = (fill * Decimal("0.9995")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+                synth = {
+                    "id": str(uuid.uuid4()),
+                    "ticker": ticker,
+                    "price": float(fill),
+                    "quantity": float(qty),
+                    "buyer_order_id": order.id if order.side == "BUY" else None,
+                    "seller_order_id": order.id if order.side == "SELL" else None,
+                    "timestamp": datetime.now(),
+                }
+                order.filled_quantity = order.original_quantity
+                order.price = fill
+                order.status = "FILLED"
+                trades.append(synth)
+
         for trade in trades:
             trade["world_id"] = self.world_id
             trade["order_id_buy"] = trade.get("buyer_order_id")
@@ -82,7 +111,7 @@ class TradingEngine:
             "side": side,
             "type": order_type,
             "quantity": float(quantity_dec),
-            "price": float(price_dec) if price_dec else None,
+            "price": float(price_dec) if price_dec else (float(order.price) if order.price else None),
             "status": order.status,
             "trades": trades
         }
@@ -116,6 +145,18 @@ class TradingEngine:
         if spread:
             return float((spread[0] + spread[1]) / 2)
         return 100.0
+
+    def _get_market_price(self, ticker: str) -> Optional[float]:
+        """从实时行情流取当前市场价，作为市价单兜底成交价。"""
+        try:
+            from app.services.market_stream import get_market_stream
+            stream = get_market_stream()
+            state = stream._assets.get(ticker)
+            if state is not None:
+                return float(state.price)
+        except Exception:
+            pass
+        return None
     
     def get_orderbook(self, ticker: str, depth: int = 10) -> Dict:
         orderbook = self.get_or_create_orderbook(ticker)
