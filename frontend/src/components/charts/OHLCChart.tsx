@@ -60,9 +60,16 @@ export default function OHLCChart({
 
     // lightweight-charts 只接受 'YYYY-MM-DD'（交易日）或 UNIX 时间戳，
     // 后端 /price-history 返回的是 'YYYY-MM-DDTHH:MM:SS'（含 T），会直接抛错导致整页崩溃。
-    // 这里统一规整为日期串、去重并按时间升序，确保图表稳定渲染。
+    // 这里统一规整为日期串、过滤非法/缺失值、去重并按时间升序，确保图表稳定渲染。
     const normalized = data
-      .map((d) => ({ ...d, time: (d.time || '').slice(0, 10) }))
+      .filter(
+        (d) =>
+          d &&
+          typeof d.time === 'string' &&
+          /^\d{4}-\d{2}-\d{2}/.test(d.time) &&
+          [d.open, d.high, d.low, d.close].every((v) => Number.isFinite(v)),
+      )
+      .map((d) => ({ ...d, time: d.time.slice(0, 10) }))
       .sort((a, b) => (a.time < b.time ? -1 : a.time > b.time ? 1 : 0))
     const seen = new Set<string>()
     const deduped = normalized.filter((d) => {
@@ -71,8 +78,13 @@ export default function OHLCChart({
       return true
     })
 
-    candlestick.setData(deduped)
-    chart.timeScale().fitContent()
+    try {
+      candlestick.setData(deduped)
+      chart.timeScale().fitContent()
+    } catch (e) {
+      // 任何数据形态异常都不应拖垮整个资产详情页
+      console.error('[OHLCChart] setData failed', e, deduped)
+    }
 
     const handleResize = () => {
       if (containerRef.current && chart) {

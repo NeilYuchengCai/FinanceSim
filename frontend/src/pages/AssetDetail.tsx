@@ -5,6 +5,7 @@ import { t } from '../i18n'
 import { useCurrentWorld } from '../hooks/useCurrentWorld'
 import { usePriceQuote } from '../hooks/usePriceStream'
 import OHLCChart from '../components/charts/OHLCChart'
+import ErrorBoundary from '../components/ErrorBoundary'
 import OrderForm from '../components/OrderForm'
 
 /**
@@ -264,7 +265,9 @@ export default function AssetDetail() {
           <button className="btn btn-sm" onClick={load}>{t('common.refresh')}</button>
         </div>
         {bars.length > 0 ? (
-          <OHLCChart data={bars} height={400} symbol={ticker} />
+          <ErrorBoundary label="priceChart">
+            <OHLCChart data={bars} height={400} symbol={ticker} />
+          </ErrorBoundary>
         ) : (
           <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-secondary)' }}>
             {t('assetDetail.noHistory')}

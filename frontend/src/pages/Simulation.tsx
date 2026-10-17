@@ -174,7 +174,9 @@ export default function Simulation() {
   const loadAll = useCallback(async () => {
     try {
       const st = await refreshStatus()
-      setPlaying(!!st && !st.is_paused)
+      // 进入页面默认暂停：时间绝不应当自作主张地走，必须等用户点“播放”。
+      // （若后端世界此前处于运行态，这里也先按暂停呈现，用户手动播放即继续推进。）
+      setPlaying(false)
       await applyDefaultSpeed(st?.speed)
       setError(null)
     } catch {

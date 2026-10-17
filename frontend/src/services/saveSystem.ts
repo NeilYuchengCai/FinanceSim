@@ -81,11 +81,9 @@ export async function loadWorld(saveId: string, worldId?: number): Promise<boole
     }
     
     // 4. 恢复运行/暂停状态
-    if (sim.is_paused) {
-      await axios.post(`/api/v1/simulation/${targetWorldId}/pause`)
-    } else {
-      await axios.post(`/api/v1/simulation/${targetWorldId}/start`)
-    }
+    // 注意：载入存档后一律保持「暂停」，等用户主动点播放才推进时间。
+    // 否则若存档是“运行中”，这里会立刻 /start，导致时钟在用户尚未操作时就开始跳变。
+    await axios.post(`/api/v1/simulation/${targetWorldId}/pause`)
     
     return true
   } catch (error) {

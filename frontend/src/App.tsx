@@ -4,6 +4,7 @@ import { useTheme } from './hooks/useTheme'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import CommandPalette from './components/CommandPalette'
 import GlobalClock from './components/GlobalClock'
+import ErrorBoundary from './components/ErrorBoundary'
 import { ToastProvider } from './components/Toast'
 import { allLazyRoutes } from './routes'
 import { t, useLanguage } from './i18n'
@@ -173,11 +174,13 @@ function App() {
           </nav>
           <main className="main-content" style={{ paddingRight: 220 }}>
             <Suspense fallback={<PageLoader />}>
-              <Routes>
-                {Object.entries(routeComponents).map(([path, Component]) => (
-                  <Route key={path} path={path} element={<Component />} />
-                ))}
-              </Routes>
+              <ErrorBoundary label="page">
+                <Routes>
+                  {Object.entries(routeComponents).map(([path, Component]) => (
+                    <Route key={path} path={path} element={<Component />} />
+                  ))}
+                </Routes>
+              </ErrorBoundary>
             </Suspense>
           </main>
           <GlobalClock />
