@@ -58,6 +58,31 @@ class PortfolioEngine:
         self.positions: Dict[str, Position] = {}
         self.trade_history: List[Dict] = []
         self.equity_curve: List[Dict] = []
+
+    def restore_from_db(self, cash: Decimal, positions: List[Dict]) -> None:
+        """从数据库恢复现金与持仓（服务重启后保持交易状态，不再重置为初始资金）。
+
+        positions: [{"ticker", "quantity", "avg_price", "last_price"}, ...]
+        """
+        self.cash = cash
+        self.positions = {}
+        for row in positions:
+            ticker = row.get("ticker")
+            if not ticker:
+                continue
+            pos = Position(
+                ticker=ticker,
+                quantity=Decimal(str(row.get("quantity") or 0)),
+                avg_price=Decimal(str(row.get("avg_price") or 0)),
+            )
+            last_price = Decimal(str(row.get("last_price") or 0))
+            if last_price > 0:
+                pos.update_price(last_price)
+            self.positions[ticker] = pos
+        logger.info(
+            "PortfolioEngine(world=%s) restored from DB: cash=%s, %d positions",
+            self.world_id, self.cash, len(self.positions),
+        )
     
     def buy(self, ticker: str, quantity: float, price: float, trade_id: str = None) -> Dict:
         """买入"""

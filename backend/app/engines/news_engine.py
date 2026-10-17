@@ -3,6 +3,7 @@ FinanceSim News Engine
 负责新闻生成、管理和传播
 """
 import random
+import uuid
 import logging
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
@@ -316,7 +317,7 @@ class NewsGenerator:
               affected_assets=None, affected_sectors=None) -> NewsItem:
         self._news_id_counter += 1
         return NewsItem(
-            id=f"NEWS-{self._news_id_counter:06d}",
+            id=str(uuid.uuid4()),
             headline=headline,
             body=body,
             importance=importance,
@@ -690,9 +691,9 @@ class NewsGenerator:
             company = kwargs.get("company", "the company")
             headline = f"{company} reports developments affecting its {kwargs.get('sector', 'sector')} operations"
         
-        # 生成ID
+        # 生成ID（uuid4：进程重启后不与历史新闻重号，落库后仍全局唯一）
         self._news_id_counter += 1
-        news_id = f"NEWS-{self._news_id_counter:06d}"
+        news_id = str(uuid.uuid4())
         
         body = self._build_body(template_type, kwargs)
         

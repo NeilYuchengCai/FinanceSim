@@ -157,6 +157,8 @@ class CommodityEngine:
             self.commodities[ticker] = {
                 "config": config,
                 "current_price": config.baseline_price,
+                # 上一个 step 的价格，用于计算真实涨跌幅（替代此前的随机编造）
+                "prev_price": config.baseline_price,
                 "last_update": datetime.now(),
                 "supply": config.supply,
                 "demand": config.demand,
@@ -173,6 +175,7 @@ class CommodityEngine:
         for ticker, state in self.commodities.items():
             config = state["config"]
             old_price = state["current_price"]
+            state["prev_price"] = old_price
 
             # 基于供需关系计算基础价格变化
             supply_demand_ratio = state["supply"] / state["demand"] if state["demand"] > 0 else 1.0
@@ -236,6 +239,8 @@ class CommodityEngine:
         if not state:
             return None
         config = state["config"]
+        prev = state.get("prev_price") or state["current_price"]
+        change_pct = ((state["current_price"] - prev) / prev * 100.0) if prev > 0 else 0.0
         return {
             "ticker": ticker.upper(),
             "name": config.name,
@@ -250,6 +255,7 @@ class CommodityEngine:
             "supply": round(state["supply"], 2),
             "demand": round(state["demand"], 2),
             "inventory": round(state["inventory"], 2),
+            "change_pct": round(change_pct, 4),
             "last_update": state["last_update"].isoformat(),
         }
 
@@ -283,6 +289,7 @@ class CommodityEngine:
             if ticker in affected:
                 state = self.commodities[ticker]
                 old_price = state["current_price"]
+                state["prev_price"] = old_price
                 # 冲击对供需的影响
                 if shock_type in ["supply_disruption", "weather"]:
                     state["supply"] *= (1 - magnitude * 0.05)
@@ -306,10 +313,11 @@ class CommodityEngine:
         return results
 
     def get_market_summary(self) -> Dict:
-        """获取市场摘要"""
+        """获取市场摘要（涨跌幅全部来自引擎维护的 prev_price，真实联动价格演化）。"""
         commodities = self.get_all_commodities()
         if not commodities:
-            return {"total": 0, "categories": {}}
+            return {"total": 0, "categories": {}, "top_gainers": [], "top_losers": [],
+                    "data_source": "SIMULATED"}
 
         # 按类别分组
         categories: Dict[str, List[Dict]] = {}
@@ -324,28 +332,36 @@ class CommodityEngine:
             "categories": {},
             "top_gainers": [],
             "top_losers": [],
+            "data_source": "SIMULATED",
         }
 
         for cat, items in categories.items():
-            # 计算类别平均变化
-            changes = [random.uniform(-0.003, 0.003) for _ in items]  # 模拟变化
-            avg_change = sum(changes) / len(changes) if changes else 0
+            # 类别平均变化：用各项真实 change_pct 计算
+            avg_change = sum(i["change_pct"] for i in items) / len(items) if items else 0
             summary["categories"][cat] = {
                 "count": len(items),
-                "avg_change_pct": round(avg_change * 100, 4),
+                "avg_change_pct": round(avg_change, 4),
                 "items": [
                     {
                         "ticker": i["ticker"],
                         "price": i["current_price"],
-                        "change_pct": round(changes[idx] * 100, 4),
+                        "change_pct": i["change_pct"],
                     }
-                    for idx, i in enumerate(items)
+                    for i in items
                 ]
             }
 
-        # 找出涨跌榜
-        sorted_items = sorted(commodities, key=lambda x: random.uniform(-0.005, 0.005), reverse=True)
-        summary["top_gainers"] = sorted_items[:3]
-        summary["top_losers"] = sorted_items[-3:]
+        # 涨跌榜按真实 change_pct 排序
+        ranked = sorted(commodities, key=lambda x: x["change_pct"], reverse=True)
+        summary["top_gainers"] = [
+            {"ticker": i["ticker"], "name": i["name"], "price": i["current_price"],
+             "change_pct": i["change_pct"]}
+            for i in ranked[:3] if i["change_pct"] > 0
+        ]
+        summary["top_losers"] = [
+            {"ticker": i["ticker"], "name": i["name"], "price": i["current_price"],
+             "change_pct": i["change_pct"]}
+            for i in reversed(ranked[-3:]) if i["change_pct"] < 0
+        ]
 
         return summary

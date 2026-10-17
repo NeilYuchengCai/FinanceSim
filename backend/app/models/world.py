@@ -1,7 +1,7 @@
 """
 FinanceSim 世界模型
 """
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, func
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, func
 from sqlalchemy.orm import relationship
 from app.models.base import Base, TimestampMixin
 
@@ -20,6 +20,10 @@ class World(Base, TimestampMixin):
     current_day = Column(Integer, default=0)
     seed = Column(String(64))
     is_archived = Column(Boolean, default=False)
+    # 世界创建参数（此前被创建接口丢弃，导致起始资金/速度/难度永不生效）
+    starting_capital = Column(Float, nullable=False, default=100000.0)
+    simulation_speed = Column(Float, nullable=False, default=1.0)
+    difficulty = Column(String(20), nullable=False, default="normal")
     
     # 关系
     assets = relationship("Asset", back_populates="world", cascade="all, delete-orphan")

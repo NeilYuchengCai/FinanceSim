@@ -213,6 +213,11 @@ class EventGenerator:
                 f"Major M&A Activity",
                 f"Significant merger or acquisition activity involving {', '.join(affected[:2]) if affected else 'companies'}."
             ),
+            "guidance": (
+                f"{affected[0] if affected else 'Company'} Updates Forward Guidance",
+                f"{affected[0] if affected else 'The company'} issued updated forward guidance, "
+                f"citing {'favorable' if severity > 0.5 else 'mixed'} operating conditions across its end markets."
+            ),
             "geopolitical": (
                 "Geopolitical Tension Escalates",
                 "Rising geopolitical tensions affecting global markets."

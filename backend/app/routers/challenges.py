@@ -9,6 +9,7 @@ from sqlalchemy import select
 import json
 
 from app.database import get_session
+from app.dependencies import get_world_or_404
 from app.models import World, Challenge, ChallengeProgress
 
 router = APIRouter(prefix="/challenges", tags=["challenges"])
@@ -23,12 +24,9 @@ async def create_challenge(
     target_days: int = Query(...),
     constraints: Optional[str] = Query(None),
     session: AsyncSession = Depends(get_session),
+    world: World = Depends(get_world_or_404),
 ):
     """创建挑战"""
-    world = await session.get(World, world_id)
-    if not world:
-        raise HTTPException(status_code=404, detail="World not found")
-
     try:
         constraints_data = json.loads(constraints) if constraints else {}
     except json.JSONDecodeError:
@@ -62,12 +60,9 @@ async def create_challenge(
 async def list_world_challenges(
     world_id: int,
     session: AsyncSession = Depends(get_session),
+    world: World = Depends(get_world_or_404),
 ):
     """列出世界的挑战"""
-    world = await session.get(World, world_id)
-    if not world:
-        raise HTTPException(status_code=404, detail="World not found")
-
     result = await session.execute(
         select(Challenge).where(Challenge.world_id == world_id).order_by(Challenge.created_at.desc())
     )

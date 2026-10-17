@@ -8,12 +8,23 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text
 
 from app.database import get_session
-from app.models import Asset, PriceHistory
+from app.dependencies import get_world_or_404
+from app.models import Asset, PriceHistory, World
 from app.engines.analytics_engine import AnalyticsEngine
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
 analytics = AnalyticsEngine()
+
+# 每个周期对应的日线截窗长度（种子与日K均为日线；"1d" 只有 1 根K线，
+# 取最近 2 根才能算出 1 个日收益率，否则返回空收益序列）。
+PERIOD_WINDOW_BARS = {
+    "1d": 2, "1w": 5, "1m": 21, "3m": 63, "6m": 126,
+    "1y": 252, "5y": 1260, "max": None,
+}
+# 年化因子：收益率序列由日线算出，统一按 252 个交易日年化。
+# 旧实现按 window 长度反推"每年多少期"，出现 "5y": 252/5=50.4 这类离谱值。
+TRADING_DAYS_PER_YEAR = 252
 
 
 @router.get("/returns/{ticker}")
@@ -21,9 +32,10 @@ async def get_returns(
     ticker: str,
     world_id: int,
     period: str = Query("1y", pattern="^(1d|1w|1m|3m|6m|1y|5y|max)$"),
+    world: World = Depends(get_world_or_404),
     session: AsyncSession = Depends(get_session)
 ):
-    """获取收益率"""
+    """获取收益率（按 period 真实截窗，年化因子统一 252）"""
     # 获取资产
     asset_result = await session.execute(
         select(Asset).where(Asset.world_id == world_id, Asset.ticker == ticker)
@@ -31,7 +43,7 @@ async def get_returns(
     asset = asset_result.scalar_one_or_none()
     if not asset:
         raise HTTPException(status_code=404, detail="Asset not found")
-    
+
     # 获取价格历史
     result = await session.execute(
         select(PriceHistory)
@@ -39,18 +51,21 @@ async def get_returns(
         .order_by(PriceHistory.timestamp.asc())
     )
     prices = [p.close for p in result.scalars().all()]
-    
+
+    # 按 period 截窗（max 取全部）
+    window = PERIOD_WINDOW_BARS.get(period)
+    if window is not None:
+        prices = prices[-window:]
+
     if len(prices) < 2:
         return {"ticker": ticker, "returns": [], "annualized_return": 0, "sharpe_ratio": 0, "max_drawdown": 0}
-    
+
     returns = analytics.calculate_returns(prices)
-    periods_map = {"1d": 252*365, "1w": 252*52, "1m": 252*12, "3m": 252*4, "6m": 252*2, "1y": 252, "5y": 252/5, "max": 252}
-    periods = periods_map.get(period, 252)
-    
+
     return {
         "ticker": ticker,
         "returns": [round(r, 6) for r in returns],
-        "annualized_return": round(analytics.annualized_return(returns, periods), 6),
+        "annualized_return": round(analytics.annualized_return(returns, TRADING_DAYS_PER_YEAR), 6),
         "sharpe_ratio": round(analytics.sharpe_ratio(returns), 4),
         "max_drawdown": analytics.max_drawdown(prices)
     }
@@ -59,13 +74,43 @@ async def get_returns(
 @router.get("/portfolio")
 async def get_portfolio_analytics(
     world_id: int,
-    session: AsyncSession = Depends(get_session)
+    world: World = Depends(get_world_or_404),
+    session: AsyncSession = Depends(get_session),
 ):
-    """获取投资组合分析"""
-    # 实现投资组合分析逻辑
+    """获取投资组合分析（真实指标，来自 PortfolioEngine；引擎不可用时 503）"""
+    from app.routers.trading import get_portfolio_engine
+
+    try:
+        portfolio = await get_portfolio_engine(world_id, session)
+    except Exception as e:  # 引擎/数据库异常：明确失败，不返回空 metrics 假装成功
+        raise HTTPException(status_code=503, detail=f"Portfolio engine unavailable: {e}")
+
+    perf = portfolio.get_performance()
+    positions = portfolio.get_all_positions()
+
+    market_value = sum(p["market_value"] for p in positions)
+    unrealized_pnl = sum(p["unrealized_pnl"] for p in positions)
+    cost_basis = sum(p["cost_basis"] for p in positions)
+    net_worth = perf.get("net_worth") or perf.get("total_value") or 0.0
+    cash = perf.get("cash", 0.0)
+
+    metrics = {
+        "cash": cash,
+        "market_value": round(market_value, 2),
+        "cost_basis": round(cost_basis, 2),
+        "unrealized_pnl": round(unrealized_pnl, 2),
+        "realized_pnl": round(perf.get("total_realized_pnl", 0.0), 2),
+        "total_invested": round(perf.get("total_invested", 0.0), 2),
+        "net_worth": round(net_worth, 2),
+        "total_value": round(perf.get("total_value", 0.0), 2),
+        "position_count": len(positions),
+        "cash_weight": round(cash / net_worth, 4) if net_worth else 0.0,
+        "positions": positions,
+    }
+
     return {
         "world_id": world_id,
-        "metrics": {}
+        "metrics": metrics,
     }
 
 

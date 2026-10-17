@@ -40,73 +40,113 @@ async def lifespan(app: FastAPI):
     await init_db()
     logger.info("Database initialized")
 
+    # 每个引擎独立 try/except：单个引擎初始化失败只置 None + 记录日志，
+    # 服务继续启动（路由层 503 分支接住），不再一损俱损。
+
     # 初始化经济引擎
     logger.info("Initializing Economic Engine...")
-    _economic_engine = EconomicEngine()
-    _central_bank = CentralBank(_economic_engine)
-    economy.init_economy(_economic_engine, _central_bank)
-    logger.info("Economic Engine initialized")
+    try:
+        _economic_engine = EconomicEngine()
+        _central_bank = CentralBank(_economic_engine)
+        economy.init_economy(_economic_engine, _central_bank)
+        logger.info("Economic Engine initialized")
+    except Exception as e:
+        _economic_engine = None
+        _central_bank = None
+        logger.exception(f"Economic Engine init failed: {e}")
 
     # 初始化债券引擎
     logger.info("Initializing Bond Engine...")
-    _bond_engine = BondEngine()
-    bonds.init_bond_engine(_bond_engine)
-    logger.info("Bond Engine initialized")
+    try:
+        _bond_engine = BondEngine()
+        bonds.init_bond_engine(_bond_engine)
+        logger.info("Bond Engine initialized")
+    except Exception as e:
+        _bond_engine = None
+        logger.exception(f"Bond Engine init failed: {e}")
 
     # 初始化新闻引擎
     logger.info("Initializing News Engine...")
-    _news_engine = NewsEngine()
-    news_router.init_news_engine(_news_engine)
-    logger.info("News Engine initialized")
+    try:
+        _news_engine = NewsEngine()
+        news_router.init_news_engine(_news_engine)
+        logger.info("News Engine initialized")
+    except Exception as e:
+        _news_engine = None
+        logger.exception(f"News Engine init failed: {e}")
 
-    from app.engines import FXEngine
-    _fx_engine = FXEngine()
-    fx.init_fx_engine(_fx_engine)
-    logger.info("FX Engine initialized")
+    logger.info("Initializing FX Engine...")
+    try:
+        _fx_engine = FXEngine()
+        fx.init_fx_engine(_fx_engine)
+        logger.info("FX Engine initialized")
+    except Exception as e:
+        _fx_engine = None
+        logger.exception(f"FX Engine init failed: {e}")
 
     # 初始化 Bot 引擎
     logger.info("Initializing Bot Engine...")
-    _bot_engine = BotEngine()
-    bot.init_bot_engine(_bot_engine)
-    logger.info("Bot Engine initialized")
+    try:
+        _bot_engine = BotEngine()
+        bot.init_bot_engine(_bot_engine)
+        logger.info("Bot Engine initialized")
+    except Exception as e:
+        _bot_engine = None
+        logger.exception(f"Bot Engine init failed: {e}")
 
     # 预置几个默认 AI 交易员，让市场一开始就有人工智能活动
-    try:
-        from app.engines import BotConfig
-        for cfg in [
-            BotConfig(name="Momentum-1", strategy="momentum", capital=100000.0, risk_tolerance=0.6),
-            BotConfig(name="MeanRev-1", strategy="mean_reversion", capital=100000.0, risk_tolerance=0.4),
-            BotConfig(name="MarketMaker-1", strategy="market_making", capital=200000.0, risk_tolerance=0.3),
-            BotConfig(name="Macro-1", strategy="macro", capital=150000.0, risk_tolerance=0.5),
-        ]:
-            _bot_engine.add_bot(cfg)
-        logger.info("Seeded %d default bots", len(_bot_engine.bots))
-    except Exception as e:
-        logger.warning(f"Failed to seed default bots: {e}")
+    if _bot_engine is not None:
+        try:
+            from app.engines import BotConfig
+            for cfg in [
+                BotConfig(name="Momentum-1", strategy="momentum", capital=100000.0, risk_tolerance=0.6),
+                BotConfig(name="MeanRev-1", strategy="mean_reversion", capital=100000.0, risk_tolerance=0.4),
+                BotConfig(name="MarketMaker-1", strategy="market_making", capital=200000.0, risk_tolerance=0.3),
+                BotConfig(name="Macro-1", strategy="macro", capital=150000.0, risk_tolerance=0.5),
+            ]:
+                _bot_engine.add_bot(cfg)
+            logger.info("Seeded %d default bots", len(_bot_engine.bots))
+        except Exception as e:
+            logger.warning(f"Failed to seed default bots: {e}")
 
     # 初始化事件引擎
     logger.info("Initializing Event Engine...")
-    _event_generator = EventGenerator(1)
-    _event_propagation = EventPropagation()
-    events.init_event_engine(_event_generator, _event_propagation)
-    logger.info("Event Engine initialized")
+    try:
+        _event_generator = EventGenerator(1)
+        _event_propagation = EventPropagation()
+        events.init_event_engine(_event_generator, _event_propagation)
+        logger.info("Event Engine initialized")
+    except Exception as e:
+        _event_generator = None
+        _event_propagation = None
+        logger.exception(f"Event Engine init failed: {e}")
 
     # 初始化商品引擎
     logger.info("Initializing Commodity Engine...")
-    _commodity_engine = CommodityEngine()
-    commodities.init_commodity_engine(_commodity_engine)
-    logger.info("Commodity Engine initialized")
+    try:
+        _commodity_engine = CommodityEngine()
+        commodities.init_commodity_engine(_commodity_engine)
+        logger.info("Commodity Engine initialized")
+    except Exception as e:
+        _commodity_engine = None
+        logger.exception(f"Commodity Engine init failed: {e}")
 
     # 启动实时行情流：内存价格每秒小幅游走，供 /api/v1/ws/prices 推送
     logger.info("Starting market price stream...")
-    await get_market_stream().start()
-    logger.info("Market price stream started")
+    try:
+        await get_market_stream().start()
+        logger.info("Market price stream started")
+    except Exception as e:
+        logger.exception(f"Market price stream failed to start: {e}")
 
     yield
 
     # 关闭时清理（先停行情流，它会把最新价格批量回写后再交给 close_db）
     logger.info("Stopping market price stream...")
-    await get_market_stream().stop()
+    try:
+        await get_market_stream().stop()
+    except Exception as e:
+        logger.warning(f"Market price stream stop failed: {e}")
     await close_db()
     logger.info("Database closed")
 

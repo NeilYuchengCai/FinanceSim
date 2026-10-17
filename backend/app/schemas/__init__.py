@@ -56,6 +56,9 @@ class AssetCreate(BaseModel):
     beta: Optional[float] = None
     volatility: Optional[float] = None
     fundamentals: Optional[Dict[str, Any]] = None
+    # 初始价格：缺省时新资产没有 current_price、也没有任何 price_history bar，
+    # 将永不上行情、不能交易；创建接口据此写入现价并插一根初始K线。
+    price: Optional[float] = Field(default=None, gt=0)
 
 
 class AssetResponse(BaseModel):

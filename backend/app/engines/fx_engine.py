@@ -23,7 +23,19 @@ class CurrencyPair:
     volatility: float = 0.0002  # 日波动率
     pip: float = 0.0001  # 最小价格变动
     last_update: datetime = field(default_factory=datetime.now)
-    
+    # 当日开盘/最高/最低：随 advance/step 真实演化，替代此前的 price*1.002 硬编码
+    day_open: float = 0.0
+    day_high: float = 0.0
+    day_low: float = 0.0
+
+    def __post_init__(self):
+        if self.day_open <= 0:
+            self.day_open = self.price
+        if self.day_high <= 0:
+            self.day_high = self.price
+        if self.day_low <= 0:
+            self.day_low = self.price
+
     def to_dict(self) -> Dict:
         return {
             "ticker": self.ticker,
@@ -33,14 +45,16 @@ class CurrencyPair:
             "spread": round(self.spread * 10000, 2),  # 转为点数
             "volatility": round(self.volatility * 100, 4),
             "change_24h": round(self._calculate_change(), 5),
-            "high_24h": round(self.price * 1.002, 5),
-            "low_24h": round(self.price * 0.998, 5),
+            "high_24h": round(self.day_high, 5),
+            "low_24h": round(self.day_low, 5),
         }
-    
+
     def _calculate_change(self) -> float:
-        """计算24小时变化"""
-        return round(random.uniform(-0.005, 0.005), 5)
-    
+        """计算24小时变化：相对当日开盘价的真实涨跌幅。"""
+        if self.day_open and self.day_open > 0:
+            return (self.price - self.day_open) / self.day_open
+        return 0.0
+
     def update(self, volatility_mult: float = 1.0) -> Dict:
         """更新价格"""
         old_price = self.price
@@ -48,7 +62,10 @@ class CurrencyPair:
         change = random.gauss(0, self.volatility * volatility_mult)
         self.price = max(0.001, self.price * (1 + change))
         self.last_update = datetime.now()
-        
+        # 维护当日高低点（必须包含当前价）
+        self.day_high = max(self.day_high, self.price)
+        self.day_low = min(self.day_low, self.price)
+
         return {
             "ticker": self.ticker,
             "old_price": round(old_price, 5),
@@ -155,9 +172,22 @@ class FXEngine:
         logger.info(f"FX step completed, updated {len(results)} pairs")
         return results
     
+    @staticmethod
+    def normalize_ticker(ticker: str) -> str:
+        """把路径参数归一化为引擎 key 形式（BASE/QUOTE）。
+
+        路径参数不能包含 "/"，前端传 'EURUSD' / 'eur-usd'，而引擎 key 是
+        'EUR/USD'；这里统一为：去空白、大写、'-'→'/'，6 位无分隔时按 3/3 插入。
+        """
+        t = (ticker or "").strip().upper().replace("-", "/").replace(" ", "")
+        compact = t.replace("/", "")
+        if len(compact) == 6:
+            return f"{compact[:3]}/{compact[3:]}"
+        return t or compact
+
     def get_pair(self, ticker: str) -> Optional[CurrencyPair]:
         """获取单个货币对"""
-        return self.pairs.get(ticker.upper())
+        return self.pairs.get(self.normalize_ticker(ticker))
     
     def get_all_pairs(self) -> List[Dict]:
         """获取所有货币对"""
@@ -165,7 +195,7 @@ class FXEngine:
     
     def get_price_history(self, ticker: str, limit: int = 100) -> List[Dict]:
         """获取历史价格"""
-        ticker = ticker.upper()
+        ticker = self.normalize_ticker(ticker)
         history = self.price_history.get(ticker, [])
         return history[-limit:]
     
@@ -214,6 +244,9 @@ class FXEngine:
             
             old_price = pair.price
             pair.price = max(0.001, pair.price * (1 + impact))
+            # 冲击同样计入当日高低点
+            pair.day_high = max(pair.day_high, pair.price)
+            pair.day_low = min(pair.day_low, pair.price)
             results[ticker] = {
                 "impact": round(impact * 100, 4),
                 "old_price": round(old_price, 5),

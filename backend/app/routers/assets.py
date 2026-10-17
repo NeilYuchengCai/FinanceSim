@@ -2,6 +2,7 @@
 FinanceSim Asset Router
 资产管理 API
 """
+from datetime import datetime
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -40,11 +41,30 @@ async def create_asset(
         market_cap=asset_data.market_cap,
         beta=asset_data.beta,
         volatility=asset_data.volatility,
-        fundamentals=asset_data.fundamentals
+        fundamentals=asset_data.fundamentals,
+        # price 不再被丢弃：写入现价，资产才能上行情、被交易
+        current_price=asset_data.price,
     )
     session.add(asset)
     await session.commit()
     await session.refresh(asset)
+
+    # 插一根初始 price_history bar，否则 Analytics / 涨跌幅 / 日K 延伸都看不到它
+    if asset_data.price:
+        now = datetime.utcnow()
+        price = float(asset_data.price)
+        session.add(PriceHistory(
+            asset_id=asset.id,
+            timestamp=now,
+            open=price,
+            high=price,
+            low=price,
+            close=price,
+            volume=0,
+            data_source="simulated",
+        ))
+        await session.commit()
+
     return asset
 
 

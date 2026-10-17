@@ -74,6 +74,8 @@ class MacroSnapshot(Base):
     money_supply = Column(Float, nullable=True)
     consumer_confidence = Column(Float, nullable=True)
     industrial_production = Column(Float, nullable=True)
+    cycle_phase = Column(String(20), nullable=True)
+    cycle_position = Column(Float, nullable=True)
     captured_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # 关系

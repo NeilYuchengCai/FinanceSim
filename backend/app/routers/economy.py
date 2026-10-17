@@ -3,9 +3,14 @@ FinanceSim Economic Router
 宏观经济 API
 """
 from typing import List, Optional
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from decimal import Decimal
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
+from app.database import get_session
+from app.dependencies import get_world_or_404
+from app.models import MacroSnapshot, World
 from app.engines import EconomicEngine, CentralBank
 
 router = APIRouter(prefix="/economy", tags=["economy"])
@@ -26,18 +31,49 @@ def init_economy(engine: EconomicEngine, cb: CentralBank):
 async def get_macro_state():
     """获取宏观经济状态"""
     if not _economic_engine:
-        return {"error": "Economic engine not initialized"}
+        raise HTTPException(status_code=503, detail="Economic engine not initialized")
     return _economic_engine.get_macro_data()
 
 
 @router.get("/history")
 async def get_macro_history(
-    limit: int = Query(100, le=500)
+    world_id: int = Query(1),
+    limit: int = Query(100, le=500),
+    world: World = Depends(get_world_or_404),
+    session: AsyncSession = Depends(get_session),
 ):
-    """获取宏观经济历史"""
-    if not _economic_engine:
-        return {"error": "Economic engine not initialized"}
-    return _economic_engine.get_history(limit)
+    """获取宏观经济历史（读 macro_snapshots 表，按 day 升序，limit 生效）。
+
+    字段契约与旧的引擎内存历史保持兼容（gdp_growth/inflation/unemployment/
+    interest_rate/money_supply/consumer_confidence/industrial_production/
+    cycle_phase/cycle_position/days_since_start/simulated_date）；
+    trade_balance 未落库，返回 None 而不是编造。
+    """
+    result = await session.execute(
+        select(MacroSnapshot)
+        .where(MacroSnapshot.world_id == world_id)
+        .order_by(MacroSnapshot.day.asc())
+        .limit(max(1, min(limit, 500)))
+    )
+    rows = result.scalars().all()
+    return [
+        {
+            "gdp_growth": r.gdp_growth,
+            "inflation": r.inflation,
+            "unemployment": r.unemployment,
+            "interest_rate": r.interest_rate,
+            "money_supply": r.money_supply,
+            "consumer_confidence": r.consumer_confidence,
+            "industrial_production": r.industrial_production,
+            "trade_balance": None,
+            "cycle_position": r.cycle_position,
+            "cycle_phase": r.cycle_phase,
+            "day": r.day,
+            "days_since_start": r.day,
+            "simulated_date": r.captured_at.isoformat() if r.captured_at else None,
+        }
+        for r in rows
+    ]
 
 
 @router.post("/step")
@@ -48,8 +84,8 @@ async def step_economy(
 ):
     """推进经济模拟"""
     if not _economic_engine:
-        return {"error": "Economic engine not initialized"}
-    
+        raise HTTPException(status_code=503, detail="Economic engine not initialized")
+
     shocks = {}
     if shock:
         shock_map = {
@@ -60,7 +96,7 @@ async def step_economy(
         }
         if shock in shock_map:
             shocks[shock_map[shock]] = magnitude
-    
+
     state = _economic_engine.step(days, shocks)
     return state
 
@@ -69,18 +105,18 @@ async def step_economy(
 async def cb_policy_review():
     """央行货币政策审查"""
     if not _central_bank:
-        return {"error": "Central bank not initialized"}
+        raise HTTPException(status_code=503, detail="Central bank not initialized")
     return _central_bank.review_policy()
 
 
 @router.post("/central-bank/action")
 async def cb_policy_action(
-    action: str = Query(..., regex="^(cut|hike|qe)$"),
+    action: str = Query(..., pattern="^(cut|hike|qe)$"),
     magnitude: float = Query(0.25, ge=0.1, le=1.0)
 ):
     """实施货币政策"""
     if not _central_bank:
-        return {"error": "Central bank not initialized"}
+        raise HTTPException(status_code=503, detail="Central bank not initialized")
     return _central_bank.implement_policy(action, magnitude)
 
 
@@ -88,8 +124,8 @@ async def cb_policy_action(
 async def get_economic_indicators():
     """获取综合经济指标"""
     if not _economic_engine:
-        return {"error": "Economic engine not initialized"}
-    
+        raise HTTPException(status_code=503, detail="Economic engine not initialized")
+
     state = _economic_engine.state
     return {
         "growth_indicators": {

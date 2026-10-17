@@ -3,7 +3,7 @@ FinanceSim FX Router
 外汇市场 API
 """
 from typing import Optional
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
 
 from app.engines import FXEngine
 
@@ -18,35 +18,47 @@ def init_fx_engine(engine: FXEngine):
     _fx_engine = engine
 
 
+def _require_engine() -> FXEngine:
+    if not _fx_engine:
+        raise HTTPException(status_code=503, detail="FX engine not initialized")
+    return _fx_engine
+
+
 @router.get("/pairs")
 async def list_pairs():
     """获取所有货币对"""
-    if not _fx_engine:
-        return {"error": "FX engine not initialized"}
-    return _fx_engine.get_all_pairs()
+    engine = _require_engine()
+    return engine.get_all_pairs()
 
 
-@router.get("/pair/{ticker}")
-async def get_pair(ticker: str):
-    """获取单个货币对详情"""
-    if not _fx_engine:
-        return {"error": "FX engine not initialized"}
-    
-    pair = _fx_engine.get_pair(ticker)
-    if not pair:
-        return {"error": f"Pair {ticker} not found"}
-    return pair.to_dict()
-
-
-@router.get("/pair/{ticker}/history")
+@router.get("/pair/{ticker:path}/history")
 async def get_history(
     ticker: str,
     limit: int = Query(100, le=500)
 ):
-    """获取历史价格"""
-    if not _fx_engine:
-        return {"error": "FX engine not initialized"}
-    return _fx_engine.get_price_history(ticker, limit)
+    """获取历史价格。
+
+    ticker 用 :path 转换器接收含 "/" 的货币对 key（如 EUR/USD）；
+    本路由必须先于 /pair/{ticker:path} 声明，否则会被详情路由捕获。
+    """
+    engine = _require_engine()
+    return engine.get_price_history(ticker, limit)
+
+
+@router.get("/pair/{ticker:path}")
+async def get_pair(ticker: str):
+    """获取单个货币对详情。
+
+    路径参数不能包含 "/"，而引擎 key 是 "EUR/USD"；这里用 :path 转换器
+    接收完整 key，并用引擎的 normalize_ticker 归一化
+    （EURUSD / eur-usd -> EUR/USD）后再查询。
+    """
+    engine = _require_engine()
+
+    pair = engine.get_pair(ticker)
+    if not pair:
+        raise HTTPException(status_code=404, detail=f"Pair {ticker} not found")
+    return pair.to_dict()
 
 
 @router.post("/step")
@@ -55,13 +67,12 @@ async def step_fx(
     volatility_mult: float = Query(1.0, ge=0.1, le=5.0)
 ):
     """推进外汇市场"""
-    if not _fx_engine:
-        return {"error": "FX engine not initialized"}
-    
+    engine = _require_engine()
+
     results = {}
     for _ in range(days):
-        results = _fx_engine.step(volatility_mult)
-    
+        results = engine.step(volatility_mult)
+
     return results
 
 
@@ -71,14 +82,12 @@ async def apply_shock(
     magnitude: float = Query(1.0, ge=0.1, le=5.0)
 ):
     """应用外部冲击"""
-    if not _fx_engine:
-        return {"error": "FX engine not initialized"}
-    return _fx_engine.apply_shock(shock_type, magnitude)
+    engine = _require_engine()
+    return engine.apply_shock(shock_type, magnitude)
 
 
 @router.get("/briefing")
 async def get_briefing():
     """获取外汇市场简报"""
-    if not _fx_engine:
-        return {"error": "FX engine not initialized"}
-    return _fx_engine.get_briefing()
+    engine = _require_engine()
+    return engine.get_briefing()

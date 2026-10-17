@@ -135,6 +135,7 @@ class BotEngine:
                         "quantity": max(bot.config.min_trade_size, qty),
                     }
 
+            executed = False
             if decision["action"] == "BUY":
                 trade = trading_engine.submit_order(
                     ticker=ticker,
@@ -147,7 +148,8 @@ class BotEngine:
                 trades.append(trade)
                 bot.cash -= decision["quantity"] * current_price
                 bot.positions[ticker] = bot.positions.get(ticker, 0) + decision["quantity"]
-                
+                executed = True
+
             elif decision["action"] == "SELL":
                 quantity = min(decision["quantity"], bot.positions.get(ticker, 0))
                 if quantity > 0:
@@ -164,12 +166,15 @@ class BotEngine:
                     bot.positions[ticker] -= quantity
                     if bot.positions[ticker] <= 0:
                         del bot.positions[ticker]
-            
-            bot.total_trades += 1
-            
+                    executed = True
+
+            # 只在真实提交成交时计数：HOLD / 无持仓可卖不计"交易"
+            if executed:
+                bot.total_trades += 1
+
         except Exception as e:
             logger.debug(f"Bot {bot.config.name} trade error: {e}")
-        
+
         return trades
     
     def _decide_action(self, bot: BotState, ticker: str, price: float, 

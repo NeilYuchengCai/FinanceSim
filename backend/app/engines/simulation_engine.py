@@ -29,7 +29,19 @@ class SimulationSpeed(Enum):
 
 class SimulationClock:
     """模拟时钟"""
-    
+
+    # 每次 tick 固定推进的模拟秒数。
+    # 旧实现按"真实 elapsed × 速度倍率"积分，X1 下要 86400 次 tick 才跨天，
+    # 导致跨天逻辑（bot 交易、事件、新闻、日K、宏观推进）被饿死。
+    # 这里改为固定步进：X1 = 1 小时/ tick，约 24 次 tick 跨天；
+    # X100 = 1 天/ tick，1 次即跨天；X1000 = 2 天/ tick。
+    SIM_SECONDS_PER_TICK = {
+        SimulationSpeed.X1: 3600,
+        SimulationSpeed.X10: 21600,
+        SimulationSpeed.X100: 86400,
+        SimulationSpeed.X1000: 172800,
+    }
+
     def __init__(self, start_time: datetime = None, current_day: int = 0):
         self.start_time = start_time or datetime.now()
         # 从持久化天数恢复时同步推进模拟时间，保证 tick() 的天数计算与恢复值自洽
@@ -52,13 +64,18 @@ class SimulationClock:
         self.is_paused = True
         logger.info(f"Simulation paused at day {self.current_day}")
     
-    def reset(self, new_start_time: datetime = None):
-        """重置模拟"""
-        self.start_time = new_start_time or datetime.now()
-        self.current_time = self.start_time
-        self.current_day = 0
+    def reset(self, new_start_time: datetime = None, day: int = 0):
+        """重置模拟。
+
+        new_start_time 缺省时保留现有起点（恢复/重置时沿用种子日期，
+        不再静默改成 datetime.now()，否则日K 日期会错位）。
+        day 用于把时钟直接落到指定天数（restore 场景）。
+        """
+        self.start_time = new_start_time or self.start_time
+        self.current_time = self.start_time + timedelta(days=day)
+        self.current_day = day
         self.is_paused = True
-        logger.info("Simulation reset")
+        logger.info(f"Simulation reset (start_time={self.start_time}, day={day})")
     
     def set_speed(self, speed: SimulationSpeed):
         """设置速度"""
@@ -75,47 +92,39 @@ class SimulationClock:
     
     def tick(self) -> bool:
         """
-        执行一个 tick
+        执行一个 tick：按当前速度固定推进模拟时间。
         Returns: True if a new day started
         """
         if self.is_paused:
             return False
-        
-        now = time.time()
-        elapsed = now - self.last_tick_time
 
-        # 根据速度计算模拟时间推进：
-        # elapsed 是真实经过的秒数，乘以速度倍率后仍是「秒」的量纲，
-        # 因此统一按秒推进模拟时间（X1 = 1 秒真实时间 -> 1 秒模拟时间）。
-        # PAUSED 的 value 为 0，倍率 0 自然不推进，无需特判。
-        multiplier = self.speed.value if isinstance(self.speed, SimulationSpeed) else 1
-        sim_delta = timedelta(seconds=elapsed * multiplier)
+        # 固定步进（不再按真实 elapsed 积分，否则 X1 下跨天需要上万次 tick）
+        sim_seconds = self.SIM_SECONDS_PER_TICK.get(self.speed, 3600)
+        self.current_time += timedelta(seconds=sim_seconds)
+        self.last_tick_time = time.time()
 
-        self.current_time += sim_delta
-        self.last_tick_time = now
-        
         # 检查是否跨天
         new_day = int((self.current_time - self.start_time).days)
         if new_day > self.current_day:
             self.current_day = new_day
             logger.info(f"New simulation day: {self.current_day}")
-            
+
             # 触发日终回调
             for cb in self.day_end_callbacks:
                 try:
                     cb(self.current_day)
                 except Exception as e:
                     logger.error(f"Day end callback error: {e}")
-            
+
             return True
-        
+
         # 触发 tick 回调
         for cb in self.tick_callbacks:
             try:
                 cb(self.current_time)
             except Exception as e:
                 logger.error(f"Tick callback error: {e}")
-        
+
         return False
     
     def step(self, days: int = 1):

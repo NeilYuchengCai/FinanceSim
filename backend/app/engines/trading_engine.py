@@ -58,14 +58,14 @@ class TradingEngine:
         )
         
         orderbook = self.get_or_create_orderbook(ticker)
-        
+
         # 处理止损单
         if order_type in ("STOP", "STOP_LIMIT") and stop_price:
             current_price = self._get_current_price(ticker)
             if self._should_trigger_stop(order, current_price):
                 order.type = "MARKET" if order_type == "STOP" else "LIMIT"
                 order.price = order.stop_price
-        
+
         try:
             trades = orderbook.add_order(order)
         except ValueError:
@@ -104,7 +104,17 @@ class TradingEngine:
             trade["order_id_sell"] = trade.get("seller_order_id")
             self.trades.append(trade)
             logger.info(f"Trade executed: {trade}")
-        
+
+        # 订单簿卫生：已完全成交的订单若残留在 bids/asks 中，
+        # get_depth 会统计出 quantity=0 的幽灵档位，这里按 id 摘除。
+        if order.remaining <= 0:
+            orderbook.cancel_order(order_id)
+
+        # 生命周期：成交/撤销的订单移出 pending，避免"已成交订单"仍挂在订单列表
+        if order.status in ("FILLED", "CANCELLED"):
+            self.pending_orders.pop(order_id, None)
+            self.completed_orders[order_id] = order
+
         return {
             "order_id": order_id,
             "ticker": ticker,
@@ -112,7 +122,11 @@ class TradingEngine:
             "type": order_type,
             "quantity": float(quantity_dec),
             "price": float(price_dec) if price_dec else (float(order.price) if order.price else None),
+            "stop_price": float(stop_price_dec) if stop_price_dec else None,
             "status": order.status,
+            "filled_quantity": float(order.filled_quantity),
+            "avg_fill_price": float(order.price) if order.filled_quantity > 0 and order.price else None,
+            "created_by": created_by,
             "trades": trades
         }
     

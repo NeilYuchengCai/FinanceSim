@@ -4,10 +4,12 @@ Bot 交易员 API
 """
 import random
 from typing import Dict, List, Optional
-from fastapi import APIRouter, Query, Body
+from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from pydantic import BaseModel
 
+from app.dependencies import get_world_or_404
 from app.engines import BotEngine, BotConfig
+from app.models import World
 
 router = APIRouter(prefix="/bots", tags=["bots"])
 
@@ -17,6 +19,12 @@ _bot_engine: Optional[BotEngine] = None
 def init_bot_engine(engine: BotEngine):
     global _bot_engine
     _bot_engine = engine
+
+
+def _require_engine() -> BotEngine:
+    if not _bot_engine:
+        raise HTTPException(status_code=503, detail="Bot engine not initialized")
+    return _bot_engine
 
 
 class AddBotRequest(BaseModel):
@@ -29,16 +37,14 @@ class AddBotRequest(BaseModel):
 
 @router.get("/stats")
 async def get_stats():
-    if not _bot_engine:
-        return {"error": "Bot engine not initialized"}
-    return _bot_engine.get_stats()
+    engine = _require_engine()
+    return engine.get_stats()
 
 
 @router.post("/add")
 async def add_bot(req: AddBotRequest):
-    if not _bot_engine:
-        return {"error": "Bot engine not initialized"}
-    
+    engine = _require_engine()
+
     config = BotConfig(
         name=req.name,
         strategy=req.strategy,
@@ -46,25 +52,24 @@ async def add_bot(req: AddBotRequest):
         capital=req.capital,
         max_position_size=req.max_position_size
     )
-    _bot_engine.add_bot(config)
+    engine.add_bot(config)
     return {"success": True, "name": req.name}
 
 
 @router.delete("/remove/{name}")
 async def remove_bot(name: str):
-    if not _bot_engine:
-        return {"error": "Bot engine not initialized"}
-    success = _bot_engine.remove_bot(name)
+    engine = _require_engine()
+    success = engine.remove_bot(name)
     return {"success": success}
 
 
 @router.post("/step")
 async def step_bots(
     world_id: int = Query(1),
+    world: World = Depends(get_world_or_404),
     tickers: List[str] = Query(default_factory=lambda: ["AAPL", "GOOGL", "MSFT", "TSLA", "AMZN", "NVDA", "JPM", "XOM"])
 ):
-    if not _bot_engine:
-        return {"error": "Bot engine not initialized"}
+    engine = _require_engine()
     trades = run_bots_for_world(world_id, tickers)
     return {"trades": len(trades), "recent_trades": trades[-10:]}
 
@@ -101,6 +106,5 @@ def run_bots_for_world(world_id: int, tickers: Optional[List[str]] = None) -> Li
 
 @router.get("/trades")
 async def get_recent_trades(limit: int = Query(50, le=200)):
-    if not _bot_engine:
-        return {"error": "Bot engine not initialized"}
-    return _bot_engine.trade_log[-limit:]
+    engine = _require_engine()
+    return engine.trade_log[-limit:]

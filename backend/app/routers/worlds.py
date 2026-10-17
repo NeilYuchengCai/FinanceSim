@@ -21,7 +21,12 @@ async def create_world(world_data: WorldCreate, session: AsyncSession = Depends(
     world = World(
         name=world_data.name,
         mode=world_data.mode,
-        seed=world_data.seed or str(uuid.uuid4())[:8]
+        seed=world_data.seed or str(uuid.uuid4())[:8],
+        # 此前 starting_capital / simulation_speed / difficulty 被创建接口丢弃，
+        # 世界行里永远只有默认值；这里按请求写入，交易与模拟才能真正按参数运行。
+        starting_capital=world_data.starting_capital,
+        simulation_speed=world_data.simulation_speed,
+        difficulty=world_data.difficulty,
     )
     session.add(world)
     await session.commit()

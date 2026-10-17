@@ -2,15 +2,20 @@
 FinanceSim Event Router
 事件、传播和时间线 API
 """
+import logging
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
 from app.database import get_session
-from app.models import Event, News
+from app.dependencies import get_world_or_404
+from app.models import Event, News, Asset, World
 from app.schemas import EventCreate, NewsResponse
 from app.engines.event_engine import EventGenerator, EventPropagation, Event as SimEvent
+from app.services.market_stream import get_market_stream
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/events", tags=["events"])
 
@@ -28,17 +33,17 @@ def init_event_engine(gen: EventGenerator, prop: EventPropagation):
 
 @router.get("", response_model=List[NewsResponse])
 async def list_news(
-    world_id: int,
+    world_id: int = Query(1),
     limit: int = Query(50, le=200),
     importance: Optional[str] = None,
     session: AsyncSession = Depends(get_session)
 ):
-    """获取新闻列表"""
+    """获取新闻列表（与 /news 同源：news 表，按 world 过滤）"""
     query = select(News).where(News.world_id == world_id).order_by(News.created_at.desc())
-    
+
     if importance:
         query = query.where(News.importance == importance.upper())
-    
+
     query = query.limit(limit)
     result = await session.execute(query)
     return result.scalars().all()
@@ -46,9 +51,10 @@ async def list_news(
 
 @router.get("/list")
 async def list_events(
-    world_id: int,
+    world_id: int = Query(1),
     limit: int = Query(50, le=200),
     event_type: Optional[str] = None,
+    world: World = Depends(get_world_or_404),
     session: AsyncSession = Depends(get_session)
 ):
     """获取事件列表"""
@@ -85,8 +91,9 @@ async def list_events(
 @router.get("/timeline/{ticker}")
 async def get_asset_timeline(
     ticker: str,
-    world_id: int,
+    world_id: int = Query(1),
     limit: int = Query(50, le=200),
+    world: World = Depends(get_world_or_404),
     session: AsyncSession = Depends(get_session)
 ):
     """获取资产事件时间线"""
@@ -117,24 +124,54 @@ async def get_asset_timeline(
 @router.post("/generate")
 async def generate_event(
     world_id: int,
+    world: World = Depends(get_world_or_404),
     session: AsyncSession = Depends(get_session)
 ):
-    """生成新事件"""
+    """生成新事件：基于该世界真实资产生成 -> 落库 -> 施加价格冲击。
+
+    旧实现里 `select(Event).__table__.c` 是无效死代码（AttributeError 500），
+    且用 TEST0..9 假资产生成；这里改为查 assets 表取真实资产，
+    返回结构与 /events/list 完全一致。
+    """
     if not _event_generator:
-        raise HTTPException(status_code=500, detail="Event generator not initialized")
-    
-    # 获取当前世界的所有资产
-    result = await session.execute(
-        select(Event).__table__.c  # 这只是测试，实际需要查询 Assets
-    )
-    
-    # 简化实现：生成一个示例事件
-    event = _event_generator.generate_event(
-        assets=[{"ticker": f"TEST{i}", "sector": "Technology"} for i in range(10)],
-        sectors=["Technology", "Finance", "Healthcare"]
-    )
-    
-    return event.to_dict()
+        raise HTTPException(status_code=503, detail="Event generator not initialized")
+
+    # 获取当前世界的真实资产
+    rows = (await session.execute(
+        select(Asset.ticker, Asset.sector).where(Asset.world_id == world_id)
+    )).all()
+    if not rows:
+        raise HTTPException(status_code=404, detail=f"No assets found for world {world_id}")
+
+    assets = [{"ticker": t, "sector": s or "Unknown"} for t, s in rows]
+    sectors = list({a["sector"] for a in assets})
+
+    event = _event_generator.generate_event(assets=assets, sectors=sectors)
+    await persist_event(world_id, event, session)
+
+    # 与每日生成路径一致：把事件影响真实传导到行情
+    try:
+        stream = get_market_stream()
+        if _event_propagation is not None and stream is not None:
+            for imp in _event_propagation.propagate(event, assets):
+                tk = imp.get("ticker")
+                if tk and tk != "MACRO":
+                    stream.apply_shock(tk, float(imp.get("impact", 0.0)) * 0.12)
+    except Exception as e:
+        logger.warning(f"Event propagation after generate failed: {e}")
+
+    return {
+        "id": event.id,
+        "type": event.type,
+        "severity": event.severity,
+        "title": event.title,
+        "body": event.body,
+        "affected_assets": event.affected_assets,
+        "affected_sectors": event.affected_sectors,
+        "sentiment_effect": event.sentiment_effect,
+        "created_at": event.created_at.isoformat(),
+        "duration_days": event.duration_days or 0
+    }
 
 
 @router.get("/propagation-summary")
