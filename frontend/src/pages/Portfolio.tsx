@@ -47,8 +47,14 @@ interface PositionRow {
   pnlPercent: number
 }
 
-// TODO(后端契约): GET /api/v1/worlds/{id} 的 WorldResponse 未返回 starting_capital，
-// 总收益率暂按后端 WorldCreate 默认初始资金 100000 计算；待该字段暴露后按世界读取。
+interface WorldInfo {
+  id: number
+  name: string
+  // 后端契约：WorldResponse 目前未返回该字段，暴露后自动生效（存在就用）
+  starting_capital?: number
+}
+
+// 后端 /worlds/{id} 未返回 starting_capital 时，按后端 WorldCreate 默认初始资金计算
 const FALLBACK_STARTING_CAPITAL = 100000
 
 const money = (v: number) => formatCurrency(Number.isFinite(v) ? v : 0)
@@ -59,6 +65,7 @@ export default function Portfolio() {
   const { prices } = usePriceStream()
   const [summary, setSummary] = useState<PortfolioSummary | null>(null)
   const [positions, setPositions] = useState<Position[]>([])
+  const [startingCapital, setStartingCapital] = useState(FALLBACK_STARTING_CAPITAL)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -66,12 +73,20 @@ export default function Portfolio() {
     setLoading(true)
     setError(null)
     try {
-      const [summaryRes, positionsRes] = await Promise.all([
+      // 世界信息独立容错：失败不影响组合数据展示，收益率回落默认初始资金
+      const [summaryRes, positionsRes, worldRes] = await Promise.all([
         axios.get<PortfolioSummary>(`/api/v1/trading/portfolio?world_id=${worldId}`),
         axios.get<Position[]>(`/api/v1/trading/portfolio/positions?world_id=${worldId}`),
+        axios.get<WorldInfo>(`/api/v1/worlds/${worldId}`).catch(() => null),
       ])
       setSummary(summaryRes.data)
       setPositions(Array.isArray(positionsRes.data) ? positionsRes.data : [])
+      const worldStartingCapital = worldRes?.data?.starting_capital
+      setStartingCapital(
+        typeof worldStartingCapital === 'number' && worldStartingCapital > 0
+          ? worldStartingCapital
+          : FALLBACK_STARTING_CAPITAL,
+      )
     } catch {
       setError(t('common.dataError'))
     } finally {
@@ -115,8 +130,8 @@ export default function Portfolio() {
     }))
 
   const totalReturnPct =
-    summary && summary.net_worth !== undefined
-      ? ((summary.net_worth - FALLBACK_STARTING_CAPITAL) / FALLBACK_STARTING_CAPITAL) * 100
+    summary && summary.net_worth !== undefined && startingCapital > 0
+      ? ((summary.net_worth - startingCapital) / startingCapital) * 100
       : 0
 
   const header = (
