@@ -58,7 +58,20 @@ export default function OHLCChart({
       wickDownColor: '#22c55e',
     })
 
-    candlestick.setData(data)
+    // lightweight-charts 只接受 'YYYY-MM-DD'（交易日）或 UNIX 时间戳，
+    // 后端 /price-history 返回的是 'YYYY-MM-DDTHH:MM:SS'（含 T），会直接抛错导致整页崩溃。
+    // 这里统一规整为日期串、去重并按时间升序，确保图表稳定渲染。
+    const normalized = data
+      .map((d) => ({ ...d, time: (d.time || '').slice(0, 10) }))
+      .sort((a, b) => (a.time < b.time ? -1 : a.time > b.time ? 1 : 0))
+    const seen = new Set<string>()
+    const deduped = normalized.filter((d) => {
+      if (seen.has(d.time)) return false
+      seen.add(d.time)
+      return true
+    })
+
+    candlestick.setData(deduped)
     chart.timeScale().fitContent()
 
     const handleResize = () => {

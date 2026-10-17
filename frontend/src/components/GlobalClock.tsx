@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { t } from '../i18n'
 import { useCurrentWorld } from '../hooks/useCurrentWorld'
 import './GlobalClock.css'
@@ -22,9 +22,27 @@ const MARKET_STATUS_KEYS: Record<string, string> = {
   HOLIDAY: 'simulation.statusClosed',
 }
 
-function formatSimTime(iso?: string): string {
-  if (!iso) return '--:--:--'
-  return iso.replace('T', ' ').slice(11, 19)
+const POLL_MS = 1000
+
+function pad(n: number): string {
+  return n < 10 ? '0' + n : '' + n
+}
+
+function fmtTime(d: Date): string {
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+}
+
+function fmtDate(d: Date): string {
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
+// 后端返回的是 naive ISO 串（无时区），直接 Date.parse 会被套用浏览器本地时区而偏移。
+// 这里按字符串分量构造本地 Date，保留原始墙钟时间，避免显示错位。
+function parseSim(iso?: string): number | null {
+  if (!iso) return null
+  const m = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})/.exec(iso)
+  if (!m) return null
+  return new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]).getTime()
 }
 
 function getWeekdayLabel(weekday?: string): string {
@@ -42,13 +60,28 @@ export default function GlobalClock() {
   const [day, setDay] = useState<number>(0)
   const [isPaused, setIsPaused] = useState<boolean>(true)
 
+  // 平滑动画用的引用：目标时间 / 上一目标 / 上次更新时刻(ms)
+  const targetRef = useRef<number | null>(null)
+  const prevTargetRef = useRef<number | null>(null)
+  const lastUpdateRef = useRef<number>(0)
+
   const fetchStatus = useCallback(async () => {
     try {
       const res = await fetch(`/api/v1/simulation/${worldId}/status`)
       if (res.ok) {
         const data = await res.json()
-        setTime(formatSimTime(data.current_time))
-        setDate(data.current_time?.slice(0, 10) ?? '')
+        const tMs = parseSim(data.current_time)
+        if (tMs !== null) {
+          if (targetRef.current === null) {
+            // 首次：直接锚定，避免从 epoch 一路飞过
+            prevTargetRef.current = tMs
+            targetRef.current = tMs
+          } else {
+            prevTargetRef.current = targetRef.current
+            targetRef.current = tMs
+          }
+          lastUpdateRef.current = performance.now()
+        }
         setWeekday(data.weekday ?? '')
         setMarketStatus(data.market_status ?? 'CLOSED')
         setSpeed(data.speed ?? 'X1')
@@ -60,12 +93,30 @@ export default function GlobalClock() {
     }
   }, [worldId])
 
+  // 平滑动画：在两次轮询之间，让显示时间从 prevTarget 线性推进到 target，
+  // 时钟因此"流动"而不是每秒整点跳变。
   useEffect(() => {
-    // 初始加载
-    fetchStatus()
+    let raf = 0
+    const tick = () => {
+      const target = targetRef.current
+      const prev = prevTargetRef.current
+      if (target !== null && prev !== null) {
+        const elapsed = performance.now() - lastUpdateRef.current
+        const frac = Math.min(Math.max(elapsed / POLL_MS, 0), 1)
+        const shown = prev + (target - prev) * frac
+        const d = new Date(shown)
+        setTime(fmtTime(d))
+        setDate(fmtDate(d))
+      }
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [])
 
-    // 每1秒刷新一次（与模拟tick同步）
-    const interval = setInterval(fetchStatus, 1000)
+  useEffect(() => {
+    fetchStatus()
+    const interval = setInterval(fetchStatus, POLL_MS)
     return () => clearInterval(interval)
   }, [fetchStatus])
 
