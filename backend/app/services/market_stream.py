@@ -251,6 +251,43 @@ class MarketStream:
 
         self._assets = states
 
+    def add_asset(self, asset: "Asset") -> None:
+        """运行时把新建资产注册进行情流，使其可立即定价/交易/推送（无需重启）。
+
+        仅在行情流已加载（_assets 非空）时生效；若尚未 start 则跳过，保持健壮。
+        参数 asset 为已提交、含 id 的 Asset ORM 实例。
+        """
+        if not self._assets:
+            return
+        asset_id = int(getattr(asset, "id", 0))
+        ticker = getattr(asset, "ticker", None)
+        if not ticker:
+            return
+        price = getattr(asset, "current_price", None)
+        if price is None or float(price) <= 0:
+            return
+        price = float(price)
+        asset_type = (getattr(asset, "type", "") or "").upper()
+        vol = float(getattr(asset, "volatility", 0) or 0)
+        if vol <= 0:
+            vol = DEFAULT_VOLATILITY.get(asset_type, 0.2)
+        vol = min(max(vol, VOL_FLOOR), VOL_CAP)
+        sigma = vol / math.sqrt(TRADING_DAYS_PER_YEAR) \
+            / math.sqrt(TICKS_PER_TRADING_DAY) * TICK_VOL_SCALE
+        self._assets[ticker] = _AssetState(
+            asset_id=asset_id,
+            ticker=ticker,
+            price=price,
+            anchor=price,
+            prev_close=price,
+            sigma=sigma,
+            decimals=_decimals_for(asset_type, price),
+            asset_type=asset_type,
+            name=getattr(asset, "name", None) or ticker,
+            sector=getattr(asset, "sector", None) or "",
+            prev_day_close=0.0,
+        )
+
     async def _load_prev_closes(self, asset_ids: List[int]) -> Dict[int, float]:
         """取每个资产上一根 K 线的收盘价作为"前收"，与 assets 列表接口口径一致。
 

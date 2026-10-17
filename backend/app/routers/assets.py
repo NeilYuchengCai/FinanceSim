@@ -65,6 +65,16 @@ async def create_asset(
         ))
         await session.commit()
 
+    # 注册进内存行情流：新建资产可立即定价、交易、推送（无需重启）。
+    # 失败不应阻塞创建本身，故静默兜底。
+    try:
+        from app.services.market_stream import get_market_stream
+        stream = get_market_stream()
+        if stream is not None:
+            stream.add_asset(asset)
+    except Exception:
+        pass
+
     return asset
 
 
