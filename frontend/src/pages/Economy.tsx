@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import axios from 'axios'
 import MacroeconomicChart from '../components/charts/MacroeconomicChart'
 import { t } from '../i18n'
+import { useCurrentWorld } from '../hooks/useCurrentWorld'
 
 interface MacroState {
   gdp_growth: number
@@ -82,6 +83,7 @@ function mapHistory(raw: unknown): HistoryPoint[] {
 }
 
 export default function Economy() {
+  const { worldId } = useCurrentWorld()
   const [state, setState] = useState<MacroState | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -111,7 +113,11 @@ export default function Economy() {
   useEffect(() => {
     const fetchHistory = async () => {
       try {
-        const res = await axios.get('/api/v1/economy/history', { params: { limit: 100 } })
+        // world_id 必填：后端 /history 已改为按世界读 macro_snapshots 表；
+        // 旧版本忽略额外 query 参数，传 world_id 对两者都兼容
+        const res = await axios.get('/api/v1/economy/history', {
+          params: { world_id: worldId, limit: 100 },
+        })
         setHistory(mapHistory(res.data))
         setHistoryError(null)
       } catch {
@@ -121,7 +127,7 @@ export default function Economy() {
       }
     }
     fetchHistory()
-  }, [])
+  }, [worldId])
 
   useEffect(() => {
     const fetchIndicators = async () => {
@@ -169,6 +175,9 @@ export default function Economy() {
 
   const formatPercent = (v: number) => `${(v * 100).toFixed(2)}%`
   const formatIndex = (v: number) => v.toFixed(2)
+  // /indicators 忠实透传：注意后端该接口单位不完全一致
+  // （gdp_growth_annual / cpi_inflation / policy_rate / unemployment_rate 为百分数，
+  //  expected_inflation / natural_rate 为小数），此处不做猜测性换算，待后端统一单位。
   const formatPctNumber = (v: number) => `${v.toFixed(2)}%`
 
   const gdpSeries = history.map((point) => ({ day: point.day, value: Number(point.gdpGrowthPct.toFixed(4)) }))
