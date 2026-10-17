@@ -38,6 +38,15 @@ async def get_sim_clock(world_id: int, session: AsyncSession) -> SimulationClock
         # Analytics 等依赖 price_history 的页面才能跟随模拟时间延伸到"当天"。
         start_time = await _seed_last_date(session, world_id) or datetime.now()
         sim_clocks[world_id] = SimulationClock(current_day=restored_day, start_time=start_time)
+
+    # 把"模拟是否暂停"接入行情流：暂停时实时价格冻结（只发心跳，不推进行情）。
+    # 读取的是 clock 的实时 is_paused，因此 start/pause/reset 无需各自回推。
+    try:
+        stream = get_market_stream()
+        stream.set_pause_provider(lambda: sim_clocks[world_id].is_paused)
+    except Exception as exc:  # pragma: no cover - 防御性兜底
+        logger.warning("Failed to wire pause provider to market stream: %s", exc)
+
     return sim_clocks[world_id]
 
 

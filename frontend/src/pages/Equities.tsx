@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { t } from '../i18n'
-import { usePriceStream, usePriceStreamStatus, type PriceQuote } from '../hooks/usePriceStream'
+import { usePriceStream, usePriceStreamStatus, usePriceStreamPaused, type PriceQuote } from '../hooks/usePriceStream'
 import { useCurrentWorld } from '../hooks/useCurrentWorld'
 import { LivePrice, LiveChange } from '../components/LiveQuote'
 
@@ -40,11 +40,23 @@ const formatVolume = (v: number | null | undefined) => {
   return String(Math.round(v))
 }
 
-const formatMarketCap = (mc: number) => (mc >= 1000 ? `${(mc / 1000).toFixed(1)}T` : `${mc.toFixed(0)}B`)
+const formatMarketCap = (mc: number | null | undefined) => {
+  if (mc === null || mc === undefined || Number.isNaN(mc)) return '--'
+  return mc >= 1000 ? `${(mc / 1000).toFixed(1)}T` : `${mc.toFixed(0)}B`
+}
 
 // ---------------------------------------------------------------- 连接状态
 function LiveStatus() {
   const live = usePriceStreamStatus()
+  const paused = usePriceStreamPaused()
+  if (paused) {
+    return (
+      <span className="live-status live-paused" style={{ marginLeft: 10 }}>
+        <span className="live-dot" />
+        {t('common.paused')}
+      </span>
+    )
+  }
   return (
     <span className={`live-status ${live ? 'live-on' : 'live-off'}`} style={{ marginLeft: 10 }}>
       <span className="live-dot" />

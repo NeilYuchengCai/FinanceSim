@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { t } from '../i18n'
-import { usePriceStream } from '../hooks/usePriceStream'
+import { usePriceStream, usePriceStreamPaused } from '../hooks/usePriceStream'
 
 interface FXPair {
   ticker: string
@@ -27,6 +27,7 @@ export default function FX() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const { prices, connected } = usePriceStream()
+  const paused = usePriceStreamPaused()
 
   useEffect(() => {
     const fetchFX = async () => {
@@ -79,8 +80,8 @@ export default function FX() {
         <h2>{t('fx.title')}</h2>
         <p className="subtitle">
           {t('fx.subtitle')} · {pairs.length} pairs
-          <span style={{ marginLeft: 16, fontSize: 12, color: connected ? 'var(--accent-green)' : 'var(--accent-red)' }}>
-            ● {connected ? t('common.live') : t('common.connecting')}
+          <span style={{ marginLeft: 16, fontSize: 12, color: paused ? 'var(--accent-amber, #e0a73c)' : connected ? 'var(--accent-green)' : 'var(--accent-red)' }}>
+            ● {paused ? t('common.paused') : connected ? t('common.live') : t('common.connecting')}
           </span>
         </p>
       </div>

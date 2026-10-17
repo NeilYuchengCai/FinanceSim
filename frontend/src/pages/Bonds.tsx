@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { t } from '../i18n'
-import { usePriceStream } from '../hooks/usePriceStream'
+import { usePriceStream, usePriceStreamPaused } from '../hooks/usePriceStream'
 import { useCurrentWorld } from '../hooks/useCurrentWorld'
 import { bondsApi } from '../services/api'
 import YieldCurveChart from '../components/charts/YieldCurveChart'
@@ -36,6 +36,7 @@ export default function Bonds() {
   const [yieldLoading, setYieldLoading] = useState(true)
   const [yieldError, setYieldError] = useState<string | null>(null)
   const { prices, connected } = usePriceStream()
+  const paused = usePriceStreamPaused()
 
   useEffect(() => {
     const fetchBonds = async () => {
@@ -103,8 +104,8 @@ export default function Bonds() {
         <h2>{t('bonds.title')}</h2>
         <p className="subtitle">
           {t('bonds.subtitle')} · {bonds.length} bonds
-          <span style={{ marginLeft: 16, fontSize: 12, color: connected ? 'var(--accent-green)' : 'var(--accent-red)' }}>
-            ● {connected ? t('common.live') : t('common.connecting')}
+          <span style={{ marginLeft: 16, fontSize: 12, color: paused ? 'var(--accent-amber, #e0a73c)' : connected ? 'var(--accent-green)' : 'var(--accent-red)' }}>
+            ● {paused ? t('common.paused') : connected ? t('common.live') : t('common.connecting')}
           </span>
         </p>
       </div>

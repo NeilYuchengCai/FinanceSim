@@ -402,6 +402,8 @@ body {
 
 .live-status.live-on .live-dot { background: var(--accent-green); }
 .live-status.live-off .live-dot { background: var(--accent-yellow); }
+.live-status.live-paused { color: var(--accent-amber, #d6a23c); }
+.live-status.live-paused .live-dot { background: var(--accent-amber, #d6a23c); }
 
 /* 中国市场惯例配色：涨红跌绿。
    注意：.positive/.negative 是欧美配色（涨绿跌红），两者不要混用；

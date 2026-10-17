@@ -57,6 +57,7 @@ export const zhCN = {
     retry: '重试',
     live: '实时',
     connecting: '连接中...',
+    paused: '已暂停',
     liveConnecting: '连接中…',
   },
   
@@ -758,6 +759,7 @@ export const enUS = {
     retry: 'Retry',
     live: 'Live',
     connecting: 'Connecting...',
+    paused: 'Paused',
     liveConnecting: 'Connecting…',
   },
 

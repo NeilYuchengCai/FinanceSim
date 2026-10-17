@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { t } from '../i18n'
 import { LivePrice, LiveChange } from '../components/LiveQuote'
-import { usePriceStreamStatus } from '../hooks/usePriceStream'
+import { usePriceStreamStatus, usePriceStreamPaused } from '../hooks/usePriceStream'
 import { useCurrentWorld } from '../hooks/useCurrentWorld'
 
 interface Quote {
@@ -106,6 +106,15 @@ function QuoteTable({ rows, valueLabel }: { rows: Quote[]; valueLabel: string })
 /** 不打扰的连接状态指示（断线时保留最后已知价格，不弹窗报错） */
 function LiveStatus() {
   const live = usePriceStreamStatus()
+  const paused = usePriceStreamPaused()
+  if (paused) {
+    return (
+      <span className="live-status live-paused" style={{ marginLeft: 10 }}>
+        <span className="live-dot" />
+        {t('common.paused')}
+      </span>
+    )
+  }
   return (
     <span className={`live-status ${live ? 'live-on' : 'live-off'}`} style={{ marginLeft: 10 }}>
       <span className="live-dot" />

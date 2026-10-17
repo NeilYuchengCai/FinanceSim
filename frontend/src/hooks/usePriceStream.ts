@@ -37,15 +37,23 @@ function resolveStreamUrl(): string {
 const quotes = new Map<string, PriceQuote>()
 const tickerListeners = new Map<string, Set<Listener>>()
 const statusListeners = new Set<Listener>()   // 连接状态变化
+const pausedListeners = new Set<Listener>()   // 模拟暂停状态变化
 const anyListeners = new Set<Listener>()      // 任意一条行情变化
 
 let socket: WebSocket | null = null
 let connected = false
+let paused = false
 let retryCount = 0
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 
 function notifyStatus() {
   for (const listener of Array.from(statusListeners)) listener()
+}
+
+function setPaused(next: boolean) {
+  if (paused === next) return
+  paused = next
+  for (const listener of Array.from(pausedListeners)) listener()
 }
 
 function setConnected(next: boolean) {
@@ -104,6 +112,11 @@ function ingest(raw: string) {
   if (typeof payload !== 'object' || payload === null) return
   const items = (payload as { items?: unknown }).items
   if (!Array.isArray(items)) return
+
+  // 后端在每帧（update / heartbeat）带上 paused 标志，前端据此同步"模拟已暂停"状态。
+  // 该字段缺省时不改动既有状态，避免超时心跳帧（无 paused 字段）误清暂停标记。
+  const rawPaused = (payload as { paused?: unknown }).paused
+  if (typeof rawPaused === 'boolean') setPaused(rawPaused)
 
   const touched: string[] = []
   for (const item of items) {
@@ -196,6 +209,22 @@ export function usePriceStreamStatus(): boolean {
     listener()
     return () => {
       statusListeners.delete(listener)
+    }
+  }, [])
+
+  return state
+}
+
+/** 模拟是否已暂停（行情冻结）。用于在状态指示灯上提示"已暂停"。 */
+export function usePriceStreamPaused(): boolean {
+  const [state, setState] = useState(paused)
+
+  useEffect(() => {
+    const listener = () => setState(paused)
+    pausedListeners.add(listener)
+    listener()
+    return () => {
+      pausedListeners.delete(listener)
     }
   }, [])
 

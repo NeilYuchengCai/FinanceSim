@@ -20,7 +20,7 @@ import math
 import random
 import time
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Set
+from typing import Callable, Dict, List, Optional, Set
 
 from sqlalchemy import select, text
 
@@ -163,6 +163,9 @@ class MarketStream:
         self._trading_cache: tuple[float, bool] = (0.0, True)
         # 实例级随机源：同一 seed 下价格游走序列可复现（restore/重放一致）
         self._rng = random.Random(seed)
+        # 模拟暂停回调：由 routers/simulation 注入，返回当前 world 的
+        # SimulationClock.is_paused。返回 True 时本循环冻结价格演进（只发心跳）。
+        self._paused_provider: Optional[Callable[[], bool]] = None
 
     # ------------------------------------------------------------ 生命周期
     async def start(self) -> None:
@@ -192,6 +195,15 @@ class MarketStream:
         except Exception:  # pragma: no cover - 关闭路径上的兜底
             logger.exception("Failed to flush prices on shutdown")
         logger.info("Market stream stopped")
+
+    # ------------------------------------------------------------ 暂停联动
+    def set_pause_provider(self, provider: "Callable[[], bool]") -> None:
+        """注册"模拟是否暂停"的查询回调，使行情流在模拟暂停时冻结价格推进。
+
+        由 routers/simulation 注入（读取各自 world 的 SimulationClock.is_paused）。
+        回调抛异常时行情流按"未暂停"处理，避免回调故障导致行情长期被冻结。
+        """
+        self._paused_provider = provider
 
     # ------------------------------------------------------------ 加载
     async def load(self) -> None:
@@ -409,11 +421,25 @@ class MarketStream:
 
     async def _tick_loop(self) -> None:
         while self._running:
+            # 模拟暂停时冻结价格演进：只发心跳帧保持连接，不再推进行情。
+            # 这样"时间没动，市场也不会浮动"——行情与模拟时钟严格同步。
+            paused = False
+            if self._paused_provider is not None:
+                try:
+                    paused = bool(self._paused_provider())
+                except Exception:
+                    # 回调故障按"未暂停"处理，避免行情被长期冻结
+                    paused = False
+            if paused:
+                self._broadcast({"type": "heartbeat", "ts": _utc_iso(), "items": [], "paused": True})
+                await asyncio.sleep(self.tick_interval)
+                continue
             try:
                 items = self.advance()
                 # 每 tick 都发一帧：有变化就带 items，休市时 items 为空，
                 # 对端据此既能拿到增量也能判断连接存活。
-                self._broadcast({"type": "update", "ts": _utc_iso(), "items": items})
+                # 带上 paused 标志，使前端能实时反映"模拟已暂停"状态。
+                self._broadcast({"type": "update", "ts": _utc_iso(), "items": items, "paused": False})
             except asyncio.CancelledError:
                 raise
             except Exception:
