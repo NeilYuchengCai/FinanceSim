@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import axios from 'axios'
 import { t } from '../i18n'
+import { useCurrentWorld, DEFAULT_WORLD_ID } from '../hooks/useCurrentWorld'
+import { useToast } from '../components/Toast'
 
 interface World {
   id: number
@@ -10,9 +12,6 @@ interface World {
   current_day: number
   created_at: string
 }
-
-const WORLD_ID_STORAGE_KEY = 'financesim-world-id'
-const DEFAULT_WORLD_ID = 1
 
 const MODE_CARDS = [
   {
@@ -44,17 +43,6 @@ const MODE_CARDS = [
   },
 ]
 
-function readCurrentWorldId(): number {
-  try {
-    const raw = window.localStorage.getItem(WORLD_ID_STORAGE_KEY)
-    if (!raw) return DEFAULT_WORLD_ID
-    const parsed = Number.parseInt(raw, 10)
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_WORLD_ID
-  } catch {
-    return DEFAULT_WORLD_ID
-  }
-}
-
 function formatDate(value: string): string {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
@@ -75,10 +63,10 @@ export default function WorldCreator() {
   const [worlds, setWorlds] = useState<World[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [currentWorldId, setCurrentWorldId] = useState<number>(readCurrentWorldId)
+  const { worldId: currentWorldId, setWorldId } = useCurrentWorld()
+  const toast = useToast()
   const [creatingMode, setCreatingMode] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<number | null>(null)
-  const [notice, setNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   const loadWorlds = useCallback(async () => {
     setLoading(true)
@@ -102,40 +90,32 @@ export default function WorldCreator() {
   useEffect(() => {
     if (loading || worlds.length === 0) return
     if (!worlds.some(w => w.id === currentWorldId)) {
-      setCurrentWorldId(DEFAULT_WORLD_ID)
+      setWorldId(DEFAULT_WORLD_ID)
     }
-  }, [loading, worlds, currentWorldId])
+  }, [loading, worlds, currentWorldId, setWorldId])
 
   const selectWorld = (worldId: number) => {
-    setCurrentWorldId(worldId)
-    try {
-      window.localStorage.setItem(WORLD_ID_STORAGE_KEY, String(worldId))
-    } catch {
-      // Storage unavailable (private mode) - selection stays in-memory only.
-    }
+    setWorldId(worldId)
     const target = worlds.find(w => w.id === worldId)
-    setNotice({
-      type: 'success',
-      text: `${t('common.success', 'Success')}: ${target ? target.name : `#${worldId}`} ${t('world.selected', 'selected as current world')}`,
-    })
+    toast.success(`${target ? target.name : `#${worldId}`} ${t('world.selected', 'selected as current world')}`)
   }
 
   const createWorld = async (mode: string, fallbackName: string) => {
     setCreatingMode(mode)
-    setNotice(null)
     try {
       const baseName = fallbackName
       const existing = worlds.filter(w => w.name === baseName || w.name.startsWith(`${baseName} `)).length
       const name = existing === 0 ? baseName : `${baseName} ${existing + 1}`
 
-      await axios.post('/api/v1/worlds', { name, mode, seed: null })
+      const res = await axios.post<World>('/api/v1/worlds', { name, mode, seed: null })
       await loadWorlds()
-      setNotice({
-        type: 'success',
-        text: `${t('common.success', 'Success')}: ${name} ${t('world.created', 'created')}`,
-      })
+      // 创建成功后立即切到新世界，后续页面请求都会带上新 world_id
+      if (res.data && Number.isFinite(res.data.id)) {
+        setWorldId(res.data.id)
+      }
+      toast.success(`${name} ${t('world.created', 'created')}`)
     } catch (err) {
-      setNotice({ type: 'error', text: toErrorMessage(err) })
+      toast.error(toErrorMessage(err))
     } finally {
       setCreatingMode(null)
     }
@@ -150,16 +130,16 @@ export default function WorldCreator() {
     if (!window.confirm(message)) return
 
     setDeletingId(world.id)
-    setNotice(null)
     try {
       await axios.delete(`/api/v1/worlds/${encodeURIComponent(String(world.id))}`)
       await loadWorlds()
-      setNotice({
-        type: 'success',
-        text: `${t('common.success', 'Success')}: ${world.name} ${t('world.deleted', 'deleted')}`,
-      })
+      // 删除的正是当前世界时回退到默认世界，避免后续请求指向已删除的 id
+      if (world.id === currentWorldId) {
+        setWorldId(DEFAULT_WORLD_ID)
+      }
+      toast.success(`${world.name} ${t('world.deleted', 'deleted')}`)
     } catch (err) {
-      setNotice({ type: 'error', text: toErrorMessage(err) })
+      toast.error(toErrorMessage(err))
     } finally {
       setDeletingId(null)
     }
@@ -173,23 +153,6 @@ export default function WorldCreator() {
           {t('world.subtitle', 'Create, manage and switch between simulation worlds')}
         </p>
       </div>
-
-      {notice && (
-        <div
-          className="card"
-          style={{
-            marginBottom: 16,
-            padding: '12px 16px',
-            borderColor: notice.type === 'success' ? 'var(--accent-green)' : 'var(--accent-red)',
-            color: notice.type === 'success' ? 'var(--accent-green)' : 'var(--accent-red)',
-            cursor: 'pointer',
-          }}
-          onClick={() => setNotice(null)}
-          title={t('common.dismiss', 'Dismiss')}
-        >
-          {notice.text}
-        </div>
-      )}
 
       <div className="card" style={{ marginBottom: 20 }}>
         <div className="card-header">

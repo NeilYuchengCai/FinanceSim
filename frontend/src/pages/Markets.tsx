@@ -3,6 +3,7 @@ import axios from 'axios'
 import { t } from '../i18n'
 import { LivePrice, LiveChange } from '../components/LiveQuote'
 import { usePriceStreamStatus } from '../hooks/usePriceStream'
+import { useCurrentWorld } from '../hooks/useCurrentWorld'
 
 interface Quote {
   ticker: string
@@ -105,13 +106,14 @@ function LiveStatus() {
 }
 
 export default function Markets() {
+  const { worldId } = useCurrentWorld()
   const [data, setData] = useState<Breadth | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
-      const res = await axios.get('/api/v1/analytics/breadth', { params: { world_id: 1 } })
+      const res = await axios.get('/api/v1/analytics/breadth', { params: { world_id: worldId } })
       if (res.data && res.data.error) throw new Error(res.data.error)
       setData(res.data)
       setError(null)
@@ -120,7 +122,7 @@ export default function Markets() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [worldId])
 
   useEffect(() => {
     load()

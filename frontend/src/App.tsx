@@ -4,6 +4,7 @@ import { useTheme } from './hooks/useTheme'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import CommandPalette from './components/CommandPalette'
 import GlobalClock from './components/GlobalClock'
+import { ToastProvider } from './components/Toast'
 import { allLazyRoutes } from './routes'
 import { t, useLanguage } from './i18n'
 import { restoreLatestSave } from './services/saveSystem'
@@ -105,82 +106,84 @@ function App() {
   }
 
   return (
-    <Router>
-      <div className="app">
-        <nav className="sidebar">
-          <div className="logo">
-            <h1>FinanceSim</h1>
-          </div>
-          <ul className="nav-menu">
-            {navItems.map(item => (
-              <li key={item.path}>
-                <Link to={item.path}>
-                  <span style={{ marginRight: 8 }}>{item.icon}</span>
-                  {item.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-          <div style={{ padding: '16px 20px', borderTop: '1px solid var(--border-color)', marginTop: 'auto' }}>
-            <button
-              onClick={openPalette}
-              style={{
-                width: '100%',
-                padding: '8px 12px',
-                borderRadius: '6px',
-                border: '1px dashed var(--border-color)',
-                background: 'transparent',
-                color: 'var(--text-secondary)',
-                cursor: 'pointer',
-                fontSize: '12px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-              }}
-            >
-              <span className="kbd">⌘</span><span className="kbd">K</span>
-              <span style={{ marginLeft: 4 }}>{t('common.search')}</span>
-            </button>
-          </div>
-          <div style={{ padding: '0 20px 16px' }}>
-            <button
-              onClick={toggleTheme}
-              style={{
-                width: '100%',
-                padding: '8px 12px',
-                borderRadius: '6px',
-                border: '1px solid var(--border-color)',
-                background: 'var(--bg-tertiary)',
-                color: 'var(--text-primary)',
-                cursor: 'pointer',
-                fontSize: '13px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px'
-              }}
-            >
-              {/* nav 块暂无主题键，兜底按当前语言取；日后同事补上 nav.themeLight/themeDark 即自动生效 */}
-              {theme === 'dark'
-                ? `☀️ ${t('nav.themeLight', language === 'en' ? 'Light Mode' : '浅色模式')}`
-                : `🌙 ${t('nav.themeDark', language === 'en' ? 'Dark Mode' : '深色模式')}`}
-            </button>
-          </div>
-        </nav>
-        <main className="main-content" style={{ paddingRight: 220 }}>
-          <Suspense fallback={<PageLoader />}>
-            <Routes>
-              {Object.entries(routeComponents).map(([path, Component]) => (
-                <Route key={path} path={path} element={<Component />} />
+    <ToastProvider>
+      <Router>
+        <div className="app">
+          <nav className="sidebar">
+            <div className="logo">
+              <h1>FinanceSim</h1>
+            </div>
+            <ul className="nav-menu">
+              {navItems.map(item => (
+                <li key={item.path}>
+                  <Link to={item.path}>
+                    <span style={{ marginRight: 8 }}>{item.icon}</span>
+                    {item.label}
+                  </Link>
+                </li>
               ))}
-            </Routes>
-          </Suspense>
-        </main>
-        <GlobalClock />
-        <CommandPalette isOpen={paletteOpen} onClose={closePalette} />
-      </div>
-    </Router>
+            </ul>
+            <div style={{ padding: '16px 20px', borderTop: '1px solid var(--border-color)', marginTop: 'auto' }}>
+              <button
+                onClick={openPalette}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  borderRadius: '6px',
+                  border: '1px dashed var(--border-color)',
+                  background: 'transparent',
+                  color: 'var(--text-secondary)',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                }}
+              >
+                <span className="kbd">⌘</span><span className="kbd">K</span>
+                <span style={{ marginLeft: 4 }}>{t('common.search')}</span>
+              </button>
+            </div>
+            <div style={{ padding: '0 20px 16px' }}>
+              <button
+                onClick={toggleTheme}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  borderRadius: '6px',
+                  border: '1px solid var(--border-color)',
+                  background: 'var(--bg-tertiary)',
+                  color: 'var(--text-primary)',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px'
+                }}
+              >
+                {/* nav 块暂无主题键，兜底按当前语言取；日后同事补上 nav.themeLight/themeDark 即自动生效 */}
+                {theme === 'dark'
+                  ? `☀️ ${t('nav.themeLight', language === 'en' ? 'Light Mode' : '浅色模式')}`
+                  : `🌙 ${t('nav.themeDark', language === 'en' ? 'Dark Mode' : '深色模式')}`}
+              </button>
+            </div>
+          </nav>
+          <main className="main-content" style={{ paddingRight: 220 }}>
+            <Suspense fallback={<PageLoader />}>
+              <Routes>
+                {Object.entries(routeComponents).map(([path, Component]) => (
+                  <Route key={path} path={path} element={<Component />} />
+                ))}
+              </Routes>
+            </Suspense>
+          </main>
+          <GlobalClock />
+          <CommandPalette isOpen={paletteOpen} onClose={closePalette} />
+        </div>
+      </Router>
+    </ToastProvider>
   )
 }
 

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import axios from 'axios'
 import { t } from '../i18n'
 import { usePriceStream } from '../hooks/usePriceStream'
+import { useCurrentWorld } from '../hooks/useCurrentWorld'
 
 interface Bond {
   bond_id: string
@@ -22,6 +23,7 @@ interface Bond {
 }
 
 export default function Bonds() {
+  const { worldId } = useCurrentWorld()
   const [bonds, setBonds] = useState<Bond[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -31,7 +33,7 @@ export default function Bonds() {
   useEffect(() => {
     const fetchBonds = async () => {
       try {
-        const res = await axios.get('/api/v1/bonds?world_id=1')
+        const res = await axios.get(`/api/v1/bonds?world_id=${worldId}`)
         setBonds(res.data)
       } catch (err) {
         setError(t('common.dataError'))
@@ -40,7 +42,7 @@ export default function Bonds() {
       }
     }
     fetchBonds()
-  }, [])
+  }, [worldId])
 
   const filtered = filter === 'ALL' ? bonds : bonds.filter(b => b.type === filter)
   const types = [...new Set(bonds.map(b => b.type))]

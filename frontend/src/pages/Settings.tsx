@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import {
   t,
   useLanguage,
@@ -9,6 +9,7 @@ import {
 import type { CurrencyCode, LanguageCode } from '../i18n'
 import { useTheme } from '../hooks/useTheme'
 import type { ThemeMode } from '../hooks/useTheme'
+import { useToast } from '../components/Toast'
 
 const SETTINGS_STORAGE_KEY = 'financesim-settings'
 
@@ -60,14 +61,8 @@ function loadSettings(): AppSettings {
 export default function Settings() {
   const { theme, setTheme } = useTheme()
   const { language, setLanguage } = useLanguage()
+  const toast = useToast()
   const [settings, setSettings] = useState<AppSettings>(loadSettings)
-  const [saved, setSaved] = useState(false)
-
-  useEffect(() => {
-    if (!saved) return
-    const timer = setTimeout(() => setSaved(false), 2500)
-    return () => clearTimeout(timer)
-  }, [saved])
 
   const persist = (patch: Partial<AppSettings>) => {
     const next = { ...settings, ...patch }
@@ -77,7 +72,8 @@ export default function Settings() {
     } catch {
       /* storage unavailable - keep in-memory state */
     }
-    setSaved(true)
+    // 保存提示统一走全局 toast（Wave 1：深色主题右上角）
+    toast.success(t('settings.saved', 'Settings saved'))
   }
 
   return (
@@ -86,16 +82,6 @@ export default function Settings() {
         <h2>{t('settings.title')}</h2>
         <p className="subtitle">{t('settings.subtitle', '配置模拟选项')}</p>
       </div>
-
-      {saved && (
-        <div className="card" style={{ borderColor: 'var(--accent-color, #4ade80)' }}>
-          <div className="card-header">
-            <span className="card-title">
-              ✅ {t('common.success')} — {t('settings.saved', 'Settings saved')}
-            </span>
-          </div>
-        </div>
-      )}
 
       <div className="card">
         <div className="card-header">

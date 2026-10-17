@@ -13,8 +13,8 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import { t } from '../i18n'
+import { useCurrentWorld } from '../hooks/useCurrentWorld'
 
-const WORLD_ID = 1
 const TRADING_DAYS = 252
 const RISK_FREE_RATE = 0.02
 const HISTORY_LIMIT = 90
@@ -150,6 +150,7 @@ function CorrelationGrid({ data }: { data: CorrelationData }) {
 }
 
 export default function Analytics() {
+  const { worldId } = useCurrentWorld()
   const [tickerOptions, setTickerOptions] = useState<string[]>([DEFAULT_TICKER])
   const [selected, setSelected] = useState(DEFAULT_TICKER)
 
@@ -170,7 +171,7 @@ export default function Analytics() {
     const load = async () => {
       try {
         const res = await axios.get('/api/v1/assets', {
-          params: { world_id: WORLD_ID, type: 'EQUITY', limit: 500 },
+          params: { world_id: worldId, type: 'EQUITY', limit: 500 },
         })
         const list: unknown[] = Array.isArray(res.data) ? res.data : []
         const all = list
@@ -186,7 +187,7 @@ export default function Analytics() {
       }
     }
     load()
-  }, [])
+  }, [worldId])
 
   // 价格历史：收益分析曲线 + 回撤分析共用同一份数据
   useEffect(() => {
@@ -195,7 +196,7 @@ export default function Analytics() {
       setPricesLoading(true)
       try {
         const res = await axios.get('/api/v1/assets/price-history', {
-          params: { ticker: selected, world_id: WORLD_ID, limit: HISTORY_LIMIT },
+          params: { ticker: selected, world_id: worldId, limit: HISTORY_LIMIT },
         })
         if (cancelled) return
         const list: unknown[] = Array.isArray(res.data) ? res.data : []
@@ -219,7 +220,7 @@ export default function Analytics() {
     return () => {
       cancelled = true
     }
-  }, [selected])
+  }, [selected, worldId])
 
   // 日收益率序列：风险指标计算用
   useEffect(() => {
@@ -228,7 +229,7 @@ export default function Analytics() {
       setReturnsLoading(true)
       try {
         const res = await axios.get(`/api/v1/analytics/returns/${encodeURIComponent(selected)}`, {
-          params: { world_id: WORLD_ID },
+          params: { world_id: worldId },
         })
         if (cancelled) return
         const list: unknown[] = Array.isArray(res.data?.returns) ? res.data.returns : []
@@ -244,7 +245,7 @@ export default function Analytics() {
     return () => {
       cancelled = true
     }
-  }, [selected])
+  }, [selected, worldId])
 
   // 相关性矩阵：固定 6 只知名标的
   useEffect(() => {
@@ -253,7 +254,7 @@ export default function Analytics() {
       setCorrelationLoading(true)
       try {
         const res = await axios.get('/api/v1/analytics/correlation', {
-          params: { world_id: WORLD_ID, tickers: CORRELATION_TICKERS.join(',') },
+          params: { world_id: worldId, tickers: CORRELATION_TICKERS.join(',') },
         })
         if (cancelled) return
         const tickers: unknown[] = Array.isArray(res.data?.tickers) ? res.data.tickers : []
@@ -277,7 +278,7 @@ export default function Analytics() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [worldId])
 
   // 累计收益率序列（以首日收盘为基准 0）
   const cumulativeSeries = useMemo(() => {

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
 import { t } from '../i18n'
+import { useCurrentWorld } from '../hooks/useCurrentWorld'
 
 interface Commodity {
   ticker: string
@@ -28,6 +29,7 @@ const CATEGORY_NAMES: Record<string, string> = {
 }
 
 export default function Commodities() {
+  const { worldId } = useCurrentWorld()
   const [commodities, setCommodities] = useState<Commodity[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -36,7 +38,7 @@ export default function Commodities() {
   useEffect(() => {
     const fetchCommodities = async () => {
       try {
-        const res = await axios.get('/api/v1/commodities?world_id=1')
+        const res = await axios.get(`/api/v1/commodities?world_id=${worldId}`)
         setCommodities(res.data)
       } catch (err) {
         setError(t('common.dataError'))
@@ -45,7 +47,7 @@ export default function Commodities() {
       }
     }
     fetchCommodities()
-  }, [])
+  }, [worldId])
 
   const filtered = filter === 'ALL' ? commodities : commodities.filter(c => c.category === filter)
   const categories = [...new Set(commodities.map(c => c.category))]

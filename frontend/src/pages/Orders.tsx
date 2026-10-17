@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
 import { t } from '../i18n'
+import { useCurrentWorld } from '../hooks/useCurrentWorld'
+import { useToast } from '../components/Toast'
 
 interface Order {
   id: string
@@ -27,6 +29,8 @@ const TYPE_LABELS: Record<string, string> = { MARKET: '市价', LIMIT: '限价',
 const STATUS_LABELS: Record<string, string> = { FILLED: '已成交', PENDING: '待成交', CANCELLED: '已取消' }
 
 export default function Orders() {
+  const { worldId } = useCurrentWorld()
+  const toast = useToast()
   const [orders, setOrders] = useState<Order[]>([])
   const [trades, setTrades] = useState<Trade[]>([])
   const [loading, setLoading] = useState(true)
@@ -41,8 +45,8 @@ export default function Orders() {
   const fetchOrders = async () => {
     try {
       const [ordersRes, tradesRes] = await Promise.all([
-        axios.get('/api/v1/trading/orders?world_id=1'),
-        axios.get('/api/v1/trading/trades?world_id=1&limit=50')
+        axios.get(`/api/v1/trading/orders?world_id=${worldId}`),
+        axios.get(`/api/v1/trading/trades?world_id=${worldId}&limit=50`)
       ])
       setOrders(ordersRes.data || [])
       setTrades(tradesRes.data || [])
@@ -55,13 +59,13 @@ export default function Orders() {
 
   useEffect(() => {
     fetchOrders()
-  }, [])
+  }, [worldId])
 
   const handleSubmitOrder = async (e: React.FormEvent) => {
     e.preventDefault()
     setSubmitting(true)
     try {
-      await axios.post(`/api/v1/trading/orders?world_id=1`, {
+      await axios.post(`/api/v1/trading/orders?world_id=${worldId}`, {
         asset_ticker: ticker,
         side: side,
         type: type,
@@ -70,8 +74,12 @@ export default function Orders() {
         stop_price: type === 'STOP' || type === 'STOP_LIMIT' ? parseFloat(price) : undefined
       })
       await fetchOrders()
+      setError(null)
+      toast.success(t('toast.orderSubmitted', '订单已提交'))
     } catch (err) {
+      // 表单内联展示（错误要在表单旁可见），同时弹全局 toast
       setError(t('common.error'))
+      toast.error(t('toast.orderSubmitFailed', '订单提交失败'))
     } finally {
       setSubmitting(false)
     }
@@ -79,10 +87,11 @@ export default function Orders() {
 
   const cancelOrder = async (orderId: string) => {
     try {
-      await axios.put(`/api/v1/trading/orders/${orderId}/cancel?world_id=1`)
+      await axios.put(`/api/v1/trading/orders/${orderId}/cancel?world_id=${worldId}`)
       await fetchOrders()
+      toast.success(t('toast.orderCancelled', '订单已取消'))
     } catch (err) {
-      setError(t('common.error'))
+      toast.error(t('toast.orderCancelFailed', '取消订单失败'))
     }
   }
 
@@ -144,6 +153,12 @@ export default function Orders() {
             <button type="submit" className="btn btn-primary" style={{ width: '100%' }} disabled={submitting}>
               {submitting ? t('orders.submitting', '提交中...') : t('orders.submit', '提交订单')}
             </button>
+            {/* 提交/取消失误内联展示在表单旁，同时有全局 toast 提醒 */}
+            {error && (
+              <div className="error" style={{ padding: 12, marginTop: 12, color: 'var(--accent-red)' }}>
+                {error}
+              </div>
+            )}
           </form>
         </div>
 
@@ -222,12 +237,6 @@ export default function Orders() {
           </tbody>
         </table>
       </div>
-
-      {error && (
-        <div className="card" style={{borderColor: 'var(--color-danger)'}}>
-          <div className="error" style={{padding: 16}}>{error}</div>
-        </div>
-      )}
     </div>
   )
 }

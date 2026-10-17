@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import axios from 'axios'
 import { t } from '../i18n'
 import { usePriceStream, usePriceStreamStatus, type PriceQuote } from '../hooks/usePriceStream'
+import { useCurrentWorld } from '../hooks/useCurrentWorld'
 import { LivePrice, LiveChange } from '../components/LiveQuote'
 
 interface Asset {
@@ -121,6 +122,7 @@ function TopMovers({ assets }: { assets: Asset[] }) {
 
 // ---------------------------------------------------------------- 页面
 export default function Equities() {
+  const { worldId } = useCurrentWorld()
   const [assets, setAssets] = useState<Asset[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -130,7 +132,7 @@ export default function Equities() {
     const fetchAssets = async () => {
       try {
         // with_change=1 让后端附带真实涨跌幅与最新成交量作为断线时的兜底数据
-        const res = await axios.get('/api/v1/assets?world_id=1&type=EQUITY&limit=500&with_change=1')
+        const res = await axios.get(`/api/v1/assets?world_id=${worldId}&type=EQUITY&limit=500&with_change=1`)
         setAssets(res.data)
       } catch (err) {
         setError(t('common.dataError', '数据加载失败'))
@@ -139,7 +141,7 @@ export default function Equities() {
       }
     }
     fetchAssets()
-  }, [])
+  }, [worldId])
 
   const filtered = filter === 'ALL' ? assets : assets.filter((a) => a.sector === filter)
   const sectors = [...new Set(assets.map((a) => a.sector))]

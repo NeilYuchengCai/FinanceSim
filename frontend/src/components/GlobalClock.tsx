@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { t } from '../i18n'
+import { useCurrentWorld } from '../hooks/useCurrentWorld'
 import './GlobalClock.css'
 
 const STORAGE_KEY = 'financesim-world-state'
@@ -32,6 +33,7 @@ function getWeekdayCN(weekday?: string): string {
 }
 
 export default function GlobalClock() {
+  const { worldId } = useCurrentWorld()
   const [time, setTime] = useState<string>('--:--:--')
   const [date, setDate] = useState<string>('')
   const [weekday, setWeekday] = useState<string>('')
@@ -42,7 +44,7 @@ export default function GlobalClock() {
 
   const fetchStatus = useCallback(async () => {
     try {
-      const res = await fetch('/api/v1/simulation/1/status')
+      const res = await fetch(`/api/v1/simulation/${worldId}/status`)
       if (res.ok) {
         const data = await res.json()
         setTime(formatSimTime(data.current_time))
@@ -56,7 +58,7 @@ export default function GlobalClock() {
     } catch {
       // 静默失败，保持当前显示
     }
-  }, [])
+  }, [worldId])
 
   useEffect(() => {
     // 初始加载

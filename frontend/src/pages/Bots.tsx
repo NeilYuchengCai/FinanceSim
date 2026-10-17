@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
 import { t } from '../i18n'
+import { useToast } from '../components/Toast'
 
 interface Bot {
   name: string
@@ -35,6 +36,7 @@ const STRATEGY_COLORS: Record<string, string> = {
 }
 
 export default function Bots() {
+  const toast = useToast()
   const [bots, setBots] = useState<Bot[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -64,8 +66,9 @@ export default function Bots() {
     try {
       await axios.post('/api/v1/bots/step')
       fetchBots()
+      toast.success(t('toast.botStepSuccess', '已执行一步'))
     } catch (err) {
-      console.error('Step failed:', err)
+      toast.error(t('toast.botStepFailed', '执行失败'))
     }
   }
 
@@ -76,8 +79,9 @@ export default function Bots() {
       setShowForm(false)
       setFormData({ name: '', strategy: 'momentum', capital: 100000, risk_tolerance: 0.5 })
       fetchBots()
+      toast.success(t('toast.botAddSuccess', '交易员已添加'))
     } catch (err) {
-      console.error('Add bot failed:', err)
+      toast.error(t('toast.botAddFailed', '添加交易员失败'))
     }
   }
 
@@ -85,8 +89,9 @@ export default function Bots() {
     try {
       await axios.delete(`/api/v1/bots/remove/${encodeURIComponent(name)}`)
       fetchBots()
+      toast.success(t('toast.botRemoveSuccess', '交易员已移除'))
     } catch (err) {
-      console.error('Failed to remove bot:', err)
+      toast.error(t('toast.botRemoveFailed', '移除交易员失败'))
     }
   }
 

@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import axios from 'axios'
 import { t } from '../i18n'
-
-const WORLD_ID = 1
+import { useCurrentWorld } from '../hooks/useCurrentWorld'
 
 // 后端 SimulationSpeed 枚举名，/speed 只接受这四个大写值
 const SPEED_OPTIONS = ['X1', 'X10', 'X100', 'X1000'] as const
@@ -102,6 +101,7 @@ function formatSimTime(iso?: string) {
 }
 
 export default function Simulation() {
+  const { worldId } = useCurrentWorld()
   const [status, setStatus] = useState<SimStatus | null>(null)
   const [speed, setSpeed] = useState<Speed>(() => loadDefaultSpeed())
   const [playing, setPlaying] = useState(false)
@@ -116,10 +116,10 @@ export default function Simulation() {
   const timerRef = useRef<number | null>(null)
 
   const refreshStatus = useCallback(async () => {
-    const res = await axios.get(`/api/v1/simulation/${WORLD_ID}/status`)
+    const res = await axios.get(`/api/v1/simulation/${worldId}/status`)
     setStatus(res.data)
     return res.data as SimStatus
-  }, [])
+  }, [worldId])
 
   const loadEconomy = useCallback(async () => {
     try {
@@ -134,14 +134,14 @@ export default function Simulation() {
   const loadEvents = useCallback(async () => {
     try {
       const res = await axios.get('/api/v1/events/list', {
-        params: { world_id: WORLD_ID, limit: 100 },
+        params: { world_id: worldId, limit: 100 },
       })
       setEvents(Array.isArray(res.data) ? res.data : [])
       setEventsError(null)
     } catch {
       setEventsError(t('common.dataError', '数据加载失败'))
     }
-  }, [])
+  }, [worldId])
 
   // 设置页的「默认速度」优先：与后端当前速度不一致时，初始化时同步一次到后端
   const applyDefaultSpeed = useCallback(async (backendSpeed?: string) => {
@@ -151,7 +151,7 @@ export default function Simulation() {
       return
     }
     try {
-      await axios.post(`/api/v1/simulation/${WORLD_ID}/speed`, null, {
+      await axios.post(`/api/v1/simulation/${worldId}/speed`, null, {
         params: { speed: preferred },
       })
       setSpeed(preferred)
@@ -163,7 +163,7 @@ export default function Simulation() {
         setSpeed(preferred)
       }
     }
-  }, [])
+  }, [worldId])
 
   const loadAll = useCallback(async () => {
     try {
@@ -191,8 +191,8 @@ export default function Simulation() {
 
     const run = async () => {
       try {
-        await axios.post(`/api/v1/simulation/${WORLD_ID}/tick`)
-        const res = await axios.get(`/api/v1/simulation/${WORLD_ID}/status`)
+        await axios.post(`/api/v1/simulation/${worldId}/tick`)
+        const res = await axios.get(`/api/v1/simulation/${worldId}/status`)
         if (!cancelled) {
           setStatus(res.data)
           setError(null)
@@ -210,15 +210,15 @@ export default function Simulation() {
         timerRef.current = null
       }
     }
-  }, [playing, speed])
+  }, [playing, speed, worldId])
 
   const togglePlay = async () => {
     try {
       if (playing) {
-        await axios.post(`/api/v1/simulation/${WORLD_ID}/pause`)
+        await axios.post(`/api/v1/simulation/${worldId}/pause`)
         setPlaying(false)
       } else {
-        await axios.post(`/api/v1/simulation/${WORLD_ID}/start`)
+        await axios.post(`/api/v1/simulation/${worldId}/start`)
         setPlaying(true)
       }
       await refreshStatus()
@@ -230,7 +230,7 @@ export default function Simulation() {
 
   const stepOnce = async () => {
     try {
-      await axios.post(`/api/v1/simulation/${WORLD_ID}/step`, null, { params: { days: 1 } })
+      await axios.post(`/api/v1/simulation/${worldId}/step`, null, { params: { days: 1 } })
       await refreshStatus()
       await Promise.all([loadEconomy(), loadEvents()])
       setError(null)
@@ -242,7 +242,7 @@ export default function Simulation() {
   const changeSpeed = async (next: Speed) => {
     setSpeed(next)
     try {
-      await axios.post(`/api/v1/simulation/${WORLD_ID}/speed`, null, { params: { speed: next } })
+      await axios.post(`/api/v1/simulation/${worldId}/speed`, null, { params: { speed: next } })
       await refreshStatus()
       setError(null)
     } catch {

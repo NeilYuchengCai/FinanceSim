@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
 import { t } from '../i18n'
+import { readWorldIdFromStorage } from '../hooks/useCurrentWorld'
 
 const STORAGE_KEY_PREFIX = 'financesim-save-'
 
@@ -19,10 +20,12 @@ function generateId(): string {
 }
 
 // 保存世界状态到localStorage
-export async function saveWorld(name: string): Promise<string> {
+// worldId 不传时读取当前选中的世界（localStorage 'financesim-world-id'，非法值回退 1）
+export async function saveWorld(name: string, worldId?: number): Promise<string> {
+  const targetWorldId = worldId ?? readWorldIdFromStorage()
   try {
-    const statusRes = await axios.get('/api/v1/simulation/1/status')
-    const assetsRes = await axios.get('/api/v1/assets?world_id=1')
+    const statusRes = await axios.get(`/api/v1/simulation/${targetWorldId}/status`)
+    const assetsRes = await axios.get(`/api/v1/assets?world_id=${targetWorldId}`)
     const economyRes = await axios.get('/api/v1/economy/state')
     
     const saveData = {
@@ -43,7 +46,9 @@ export async function saveWorld(name: string): Promise<string> {
 }
 
 // 从localStorage加载世界状态
-export async function loadWorld(saveId: string): Promise<boolean> {
+// worldId 不传时读取当前选中的世界（与 saveWorld 一致）
+export async function loadWorld(saveId: string, worldId?: number): Promise<boolean> {
+  const targetWorldId = worldId ?? readWorldIdFromStorage()
   try {
     const data = localStorage.getItem(`${STORAGE_KEY_PREFIX}${saveId}`)
     if (!data) return false
@@ -53,14 +58,14 @@ export async function loadWorld(saveId: string): Promise<boolean> {
     const targetDay = sim.current_day || 0
     
     // 1. 重置模拟时钟后再步进到目标天数，恢复模拟时间
-    await axios.post(`/api/v1/simulation/1/reset`)
+    await axios.post(`/api/v1/simulation/${targetWorldId}/reset`)
     if (targetDay > 0) {
-      await axios.post(`/api/v1/simulation/1/step`, null, { params: { days: targetDay } })
+      await axios.post(`/api/v1/simulation/${targetWorldId}/step`, null, { params: { days: targetDay } })
     }
     
     // 2. 恢复速度设定
     if (sim.speed) {
-      await axios.post(`/api/v1/simulation/1/speed`, null, { params: { speed: sim.speed } })
+      await axios.post(`/api/v1/simulation/${targetWorldId}/speed`, null, { params: { speed: sim.speed } })
     }
     
     // 3. 按存档中记录的价格恢复资产（通过 ticker 匹配内存行情流）
@@ -69,7 +74,7 @@ export async function loadWorld(saveId: string): Promise<boolean> {
       if (a.ticker && typeof a.current_price === 'number') {
         try {
           await axios.put(`/api/v1/assets/${a.ticker}/price`, null, {
-            params: { price: a.current_price, world_id: 1 }
+            params: { price: a.current_price, world_id: targetWorldId }
           })
         } catch {
           // 个别资产可能不在行情流中，忽略
@@ -79,9 +84,9 @@ export async function loadWorld(saveId: string): Promise<boolean> {
     
     // 4. 恢复运行/暂停状态
     if (sim.is_paused) {
-      await axios.post(`/api/v1/simulation/1/pause`)
+      await axios.post(`/api/v1/simulation/${targetWorldId}/pause`)
     } else {
-      await axios.post(`/api/v1/simulation/1/start`)
+      await axios.post(`/api/v1/simulation/${targetWorldId}/start`)
     }
     
     return true

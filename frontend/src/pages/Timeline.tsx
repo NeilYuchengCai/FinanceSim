@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import axios from 'axios'
 import OHLCChart from '../components/charts/OHLCChart'
 import { t } from '../i18n'
+import { useCurrentWorld } from '../hooks/useCurrentWorld'
 
 interface Event {
   id: string
@@ -42,6 +43,7 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
 }
 
 export default function TimelinePage() {
+  const { worldId } = useCurrentWorld()
   const [events, setEvents] = useState<Event[]>([])
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null)
   const [priceHistory, setPriceHistory] = useState<PricePoint[]>([])
@@ -50,7 +52,7 @@ export default function TimelinePage() {
 
   const fetchEvents = async () => {
     try {
-      const res = await axios.get('/api/v1/events/list', { params: { world_id: 1, limit: 100 } })
+      const res = await axios.get('/api/v1/events/list', { params: { world_id: worldId, limit: 100 } })
       setEvents(res.data || [])
     } catch (e) {
       console.error('Failed to fetch events:', e)
@@ -63,7 +65,7 @@ export default function TimelinePage() {
     fetchEvents()
     const id = setInterval(fetchEvents, 3000)
     return () => clearInterval(id)
-  }, [])
+  }, [worldId])
 
   const handleEventClick = async (event: Event) => {
     setSelectedEvent(event)
