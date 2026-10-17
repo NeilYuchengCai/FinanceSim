@@ -2,6 +2,7 @@
 FinanceSim News Router
 新闻 API
 """
+import logging
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Path
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -72,6 +73,11 @@ async def get_briefing(
     if not _news_engine:
         raise HTTPException(status_code=503, detail="News engine not initialized")
 
+    # 可选：先用外部新闻 provider 刷新头条（失败/未启用则保持合成）
+    try:
+        await _news_engine.refresh_external_news(limit=20)
+    except Exception as exc:
+        logger.warning("External news refresh skipped: %s", exc)
     _news_engine.ensure_populated()
     return _news_engine.get_briefing(hours)
 
@@ -84,6 +90,11 @@ async def get_headlines(
     if not _news_engine:
         raise HTTPException(status_code=503, detail="News engine not initialized")
 
+    # 可选：先用外部新闻 provider 刷新头条（失败/未启用则保持合成）
+    try:
+        await _news_engine.refresh_external_news(limit=limit)
+    except Exception as exc:
+        logger.warning("External news refresh skipped: %s", exc)
     return _news_engine.get_headlines(limit)
 
 

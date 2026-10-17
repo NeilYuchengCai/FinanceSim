@@ -24,6 +24,7 @@ from typing import Callable, Dict, List, Optional, Set
 
 from sqlalchemy import select, text
 
+from app.core.datasource import DataSource
 from app.database import async_session_factory
 from app.models import Asset
 
@@ -98,7 +99,7 @@ class _AssetState:
 
     __slots__ = ("asset_id", "ticker", "price", "anchor", "prev_close",
                  "sigma", "decimals", "last_sent", "asset_type", "name", "sector",
-                 "prev_day_close")
+                 "prev_day_close", "data_source")
 
     def __init__(self, asset_id: int, ticker: str, price: float, anchor: float,
                  prev_close: float, sigma: float, decimals: int,
@@ -117,6 +118,8 @@ class _AssetState:
         self.sector = sector
         # 上一个模拟交易日收盘（由 record_daily_bar 维护），用于计算"当日涨跌幅"
         self.prev_day_close = prev_day_close
+        # 价格来源标记：默认 SIMULATED，外部行情接入后可标为 LIVE
+        self.data_source: str = DataSource.SIMULATED.value
 
     def change_pct(self, price: float) -> float:
         if self.prev_close and self.prev_close > 0:
@@ -144,6 +147,7 @@ class _AssetState:
             "t": self.ticker, "p": price, "c": round(self.change_pct(price), 2),
             "n": self.name, "s": self.sector, "y": self.asset_type,
             "d": round(self.daily_change_pct(), 2),
+            "ds": self.data_source,
         }
 
 
@@ -262,6 +266,57 @@ class MarketStream:
             )
 
         self._assets = states
+
+        # ---------------------------------------------------------------- 可选外部行情接入（OFFLINE-FIRST）
+        # 仅在总开关打开且价格 provider 启用时，尝试用真实报价覆盖 current_price，
+        # 并把对应资产标记为 LIVE。任何失败都只记日志并保留既有合成价格，绝不中断启动。
+        # 默认 USE_EXTERNAL_DATA=False 且无 key，此分支整段跳过，行为与原先完全一致。
+        await self._maybe_seed_live_prices(states)
+
+    async def _maybe_seed_live_prices(self, states: Dict[str, "_AssetState"]) -> None:
+        """用外部价格 provider 给内存状态播种真实报价（防御性、可选）。"""
+        if not states:
+            return
+        try:
+            from app.config import settings
+            if not settings.USE_EXTERNAL_DATA:
+                return
+            from app.data.providers import get_provider, maybe_fetch
+
+            price_provider = get_provider("alpha_vantage")
+            if price_provider is None or not price_provider.enabled:
+                return
+
+            tickers = [st.ticker for st in states.values()]
+            quotes = await maybe_fetch(price_provider, symbols=tickers)
+            if not quotes:
+                return
+
+            updated = 0
+            for ticker, st in states.items():
+                q = quotes.get(ticker)
+                if not isinstance(q, dict):
+                    continue
+                price = q.get("price")
+                if price is None:
+                    continue
+                try:
+                    price = float(price)
+                except (TypeError, ValueError):
+                    continue
+                if price <= 0:
+                    continue
+                st.price = price
+                st.anchor = price  # 让后续 GBM 围绕真实价波动，而不是直接跳回种子价
+                st.data_source = DataSource.LIVE.value
+                updated += 1
+            if updated:
+                logger.info(
+                    "Seeded %d live prices from %s (rest remain SIMULATED)",
+                    updated, price_provider.name,
+                )
+        except Exception as exc:  # 绝不允许外部数据影响启动
+            logger.warning("External price seeding failed, keeping synthetic prices: %s", exc)
 
     def add_asset(self, asset: "Asset") -> None:
         """运行时把新建资产注册进行情流，使其可立即定价/交易/推送（无需重启）。

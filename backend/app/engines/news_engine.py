@@ -947,6 +947,55 @@ class NewsEngine:
         """
         self.ensure_populated()
         return self.generator.get_news(limit=limit)
+
+    async def refresh_external_news(self, limit: int = 20) -> bool:
+        """可选：用外部新闻 provider 的真实头条覆盖合成新闻（只覆盖，不合并）。
+
+        仅在 ``USE_EXTERNAL_DATA`` 且新闻 provider 启用时尝试；任何失败（无 key /
+        网络 / 解析 / 限流）都被 ``maybe_fetch`` 吞掉并返回 ``None``，这里安全返回
+        ``False`` 并保留原有（合成）新闻。成功返回 ``True``。
+        """
+        from app.data.providers import get_provider, maybe_fetch
+
+        provider = get_provider("news_api")
+        if provider is None or not provider.enabled:
+            return False
+
+        try:
+            items = await maybe_fetch(provider, query="finance OR markets OR economy",
+                                     limit=limit)
+        except Exception as exc:  # 双保险
+            logger.warning("External news fetch unexpected error: %s", exc)
+            return False
+        if not items:
+            return False
+
+        news_items = []
+        for it in items:
+            headline = (it.get("headline") or "").strip()
+            if not headline:
+                continue
+            news_items.append(NewsItem(
+                id=str(uuid.uuid4()),
+                headline=headline,
+                body=it.get("body") or "",
+                importance=NewsImportance.MARKET,
+                sentiment=0.0,
+                category="GLOBAL",
+                affected_assets=[],
+                affected_sectors=[],
+                source=it.get("source") or provider.name,
+                created_at=datetime.now(),
+                is_read=False,
+            ))
+        if not news_items:
+            return False
+
+        # 用真实头条替换合成新闻（保留 archived_news 归档不变）
+        self.generator.news_items = news_items
+        logger.info("Headlines refreshed from external provider %s (%d items)",
+                    provider.name, len(news_items))
+        return True
     
     def get_briefing(self, hours: int = 24) -> Dict:
         """获取简报"""

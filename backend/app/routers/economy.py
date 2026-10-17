@@ -2,6 +2,7 @@
 FinanceSim Economic Router
 宏观经济 API
 """
+import logging
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from decimal import Decimal
@@ -85,6 +86,13 @@ async def step_economy(
     """推进经济模拟"""
     if not _economic_engine:
         raise HTTPException(status_code=503, detail="Economic engine not initialized")
+
+    # 可选：首次推进时尝试用 FRED 真实宏观数据种子合成状态。
+    # 仅在 USE_EXTERNAL_DATA 且 FRED 启用时生效；失败/未启用则静默跳过。
+    try:
+        await _economic_engine.seed_from_external()
+    except Exception as exc:  # 绝不影响主流程
+        logger.warning("External macro seeding skipped/failed: %s", exc)
 
     shocks = {}
     if shock:

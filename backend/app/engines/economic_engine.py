@@ -12,6 +12,20 @@ from datetime import datetime, timedelta
 logger = logging.getLogger(__name__)
 
 
+def _latest_float(observations) -> Optional[float]:
+    """从 FRED 观测列表（按日期降序）取最新一条的浮点值；无有效值返回 None。"""
+    if not observations:
+        return None
+    first = observations[0]
+    raw = first.get("value") if isinstance(first, dict) else None
+    if raw in (None, "", "."):
+        return None
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return None
+
+
 @dataclass
 class MacroState:
     """宏观经济状态"""
@@ -85,7 +99,9 @@ class EconomicEngine:
         self.history: List[Dict] = []
         self._gdp_history: List[float] = []
         self._inflation_history: List[float] = []
-        
+        # 外部数据是否已用于种子/覆盖（保证只种子一次，不与合成演化反复打架）
+        self._externally_seeded: bool = False
+
         # 记录初始状态
         self.history.append(self.state.to_dict())
     
@@ -268,6 +284,62 @@ class EconomicEngine:
     def get_macro_data(self) -> Dict:
         """获取当前宏观数据"""
         return self.state.to_dict()
+
+    # ------------------------------------------------------------ 外部数据（可选）
+    async def seed_from_external(self) -> bool:
+        """可选：用 FRED 真实宏观序列覆盖/种子合成状态（只做一次）。
+
+        仅当 FRED provider 启用且总开关打开时 ``maybe_fetch`` 才会返回数据；
+        否则立即返回 ``False``，不影响任何合成行为。任何异常（网络/限额/解析）
+        都被 ``maybe_fetch`` 吞掉并返回 ``None``，这里也安全返回 ``False``。
+
+        返回 ``True`` 表示成功用真实数据覆盖了利率/失业/通胀。
+        """
+        if self._externally_seeded:
+            return False
+        from app.data.providers import get_provider, maybe_fetch
+
+        fred = get_provider("fred")
+        if fred is None or not fred.enabled:
+            return False
+
+        # CPI(通胀，需同比)、联邦基金利率、失业率
+        series = await maybe_fetch(
+            fred, series_ids=["CPIAUCSL", "FEDFUNDS", "UNRATE"], limit=13
+        )
+        if not series:
+            return False
+
+        self.apply_fred_series(series)
+        self._externally_seeded = True
+        logger.info("Macro state seeded from FRED external series")
+        return True
+
+    def apply_fred_series(self, series: Dict) -> None:
+        """把 FRED 观测映射进宏状态（纯同步，便于测试直接调用）。
+
+        FRED 数值是"百分比"量纲（如 5.33 表示 5.33%），本平台状态用小数（0.0533），
+        因此利率/失业率需除以 100。通胀由 CPI 同比（YoY）近似。
+        """
+        # 利率：FEDFUNDS 最新值
+        ff = _latest_float(series.get("FEDFUNDS"))
+        if ff is not None:
+            self.state.interest_rate = max(0.0, min(0.20, ff / 100.0))
+        # 失业率：UNRATE 最新值
+        un = _latest_float(series.get("UNRATE"))
+        if un is not None:
+            self.state.unemployment = max(0.02, min(0.25, un / 100.0))
+        # 通胀：CPIAUCSL 同比（观测按日期降序，索引 0 最新、末尾约一年前）
+        cpi = series.get("CPIAUCSL") or []
+        if len(cpi) >= 2:
+            try:
+                now_v = float(cpi[0].get("value"))
+                ya_v = float(cpi[-1].get("value"))
+                if ya_v > 0:
+                    yoy = now_v / ya_v - 1.0
+                    self.state.inflation = max(-0.05, min(0.20, yoy))
+            except (TypeError, ValueError):
+                pass
     
     def get_history(self, limit: int = 100) -> List[Dict]:
         """获取历史数据"""
