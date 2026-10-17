@@ -73,19 +73,19 @@ export default function Settings() {
       /* storage unavailable - keep in-memory state */
     }
     // 保存提示统一走全局 toast（Wave 1：深色主题右上角）
-    toast.success(t('settings.saved', 'Settings saved'))
+    toast.success(t('settings.saved'))
   }
 
   return (
     <div>
       <div className="page-header">
         <h2>{t('settings.title')}</h2>
-        <p className="subtitle">{t('settings.subtitle', '配置模拟选项')}</p>
+        <p className="subtitle">{t('settings.subtitle')}</p>
       </div>
 
       <div className="card">
         <div className="card-header">
-          <span className="card-title">{t('settings.general', '通用设置')}</span>
+          <span className="card-title">{t('settings.general')}</span>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
@@ -111,7 +111,7 @@ export default function Settings() {
             </select>
           </div>
           <div>
-            <label>{t('settings.currencyDisplay', '货币显示')}</label>
+            <label>{t('settings.currencyDisplay')}</label>
             <select
               className="input-field"
               value={settings.currency}
@@ -122,7 +122,7 @@ export default function Settings() {
               ))}
             </select>
             <p className="subtitle" style={{ marginTop: 6 }}>
-              {t('settings.preview', '预览')}: {formatCurrency(1234.5, settings.currency, language)}
+              {t('settings.preview')}: {formatCurrency(1234.5, settings.currency, language)}
             </p>
           </div>
         </div>
@@ -130,11 +130,11 @@ export default function Settings() {
 
       <div className="card">
         <div className="card-header">
-          <span className="card-title">{t('settings.simulation', '模拟设置')}</span>
+          <span className="card-title">{t('settings.simulation')}</span>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
-            <label>{t('settings.defaultSpeed', '默认速度')}</label>
+            <label>{t('settings.defaultSpeed')}</label>
             <select
               className="input-field"
               value={settings.defaultSpeed}
@@ -146,7 +146,7 @@ export default function Settings() {
             </select>
           </div>
           <div>
-            <label>{t('settings.dataSource', '数据源')}</label>
+            <label>{t('settings.dataSource')}</label>
             <select
               className="input-field"
               value={settings.dataSource}
@@ -154,7 +154,7 @@ export default function Settings() {
             >
               {DATA_SOURCE_OPTIONS.map(source => (
                 <option key={source} value={source}>
-                  {source === 'fallback' ? t('settings.fallback', '内置数据') : DATA_SOURCE_LABELS[source]}
+                  {source === 'fallback' ? t('settings.fallback') : DATA_SOURCE_LABELS[source]}
                 </option>
               ))}
             </select>

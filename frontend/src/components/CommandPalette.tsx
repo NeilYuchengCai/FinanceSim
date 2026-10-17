@@ -177,7 +177,7 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
             ref={inputRef}
             value={query}
             onChange={e => setQuery(e.target.value)}
-            placeholder={t('palette.placeholder', '搜索命令或页面...')}
+            placeholder={t('palette.placeholder')}
             style={{
               flex: 1,
               background: 'transparent',
@@ -194,7 +194,7 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
         <div style={{ maxHeight: '60vh', overflowY: 'auto' }}>
           {filtered.length === 0 ? (
             <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-              {t('palette.noResults', '无匹配结果')}
+              {t('palette.noResults')}
             </div>
           ) : (
             filtered.map((cmd, i) => (
@@ -234,9 +234,9 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
           fontSize: 12,
           color: 'var(--text-secondary)',
         }}>
-          <span><kbd className="kbd">↑</kbd><kbd className="kbd">↓</kbd> {t('palette.navigate', '导航')}</span>
-          <span><kbd className="kbd">↵</kbd> {t('palette.select', '选择')}</span>
-          <span><kbd className="kbd">ESC</kbd> {t('palette.close', '关闭')}</span>
+          <span><kbd className="kbd">↑</kbd><kbd className="kbd">↓</kbd> {t('palette.navigate')}</span>
+          <span><kbd className="kbd">↵</kbd> {t('palette.select')}</span>
+          <span><kbd className="kbd">ESC</kbd> {t('palette.close')}</span>
         </div>
       </div>
     </div>

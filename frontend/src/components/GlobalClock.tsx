@@ -73,7 +73,7 @@ export default function GlobalClock() {
   const statusText = marketStatus === 'OPEN' ? '开市' : marketStatus === 'WEEKEND' ? '周末' : '休市'
 
   return (
-    <div className="global-clock" title={`${t('simulation.title', '模拟设置')} | Day ${day}`}>
+    <div className="global-clock" title={`${t('simulation.title')} | Day ${day}`}>
       <div className="clock-top">
         <span className="clock-date">
           {date} {getWeekdayCN(weekday)}

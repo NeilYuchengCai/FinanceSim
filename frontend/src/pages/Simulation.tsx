@@ -127,7 +127,7 @@ export default function Simulation() {
       setEconomy(res.data)
       setEconomyError(null)
     } catch {
-      setEconomyError(t('common.dataError', '数据加载失败'))
+      setEconomyError(t('common.dataError'))
     }
   }, [])
 
@@ -139,7 +139,7 @@ export default function Simulation() {
       setEvents(Array.isArray(res.data) ? res.data : [])
       setEventsError(null)
     } catch {
-      setEventsError(t('common.dataError', '数据加载失败'))
+      setEventsError(t('common.dataError'))
     }
   }, [worldId])
 
@@ -172,7 +172,7 @@ export default function Simulation() {
       await applyDefaultSpeed(st?.speed)
       setError(null)
     } catch {
-      setError(t('common.dataError', '数据加载失败'))
+      setError(t('common.dataError'))
     } finally {
       setLoading(false)
     }
@@ -198,7 +198,7 @@ export default function Simulation() {
           setError(null)
         }
       } catch {
-        if (!cancelled) setError(t('common.dataError', '数据加载失败'))
+        if (!cancelled) setError(t('common.dataError'))
       }
     }
 
@@ -224,7 +224,7 @@ export default function Simulation() {
       await refreshStatus()
       setError(null)
     } catch {
-      setError(t('simulation.actionFailed', '操作失败'))
+      setError(t('simulation.actionFailed'))
     }
   }
 
@@ -235,7 +235,7 @@ export default function Simulation() {
       await Promise.all([loadEconomy(), loadEvents()])
       setError(null)
     } catch {
-      setError(t('simulation.actionFailed', '操作失败'))
+      setError(t('simulation.actionFailed'))
     }
   }
 
@@ -246,14 +246,14 @@ export default function Simulation() {
       await refreshStatus()
       setError(null)
     } catch {
-      setError(t('simulation.actionFailed', '操作失败'))
+      setError(t('simulation.actionFailed'))
     }
   }
 
   const header = (
     <div className="page-header">
       <h2>{t('simulation.title')}</h2>
-      <p className="subtitle">{t('simulation.subtitle', '控制模拟时钟')}</p>
+      <p className="subtitle">{t('simulation.subtitle')}</p>
     </div>
   )
 
@@ -262,7 +262,7 @@ export default function Simulation() {
       <div>
         {header}
         <div className="card">
-          <div className="loading" style={{ padding: 40 }}>{t('common.loading', '加载中...')}</div>
+          <div className="loading" style={{ padding: 40 }}>{t('common.loading')}</div>
         </div>
       </div>
     )
@@ -285,14 +285,14 @@ export default function Simulation() {
 
       <div className="card">
         <div className="card-header">
-          <span className="card-title">{t('simulation.controls', '模拟控制')}</span>
+          <span className="card-title">{t('simulation.controls')}</span>
           <span className={`badge badge-dot ${playing ? 'green' : 'gray'}`}></span>
         </div>
 
         <div style={{ display: 'flex', gap: 20, alignItems: 'center', flexWrap: 'wrap' }}>
           {/* 模拟时间：来自后端 start_time 推进，精确到秒 */}
           <div>
-            <div className="stat-change">{t('simulation.simTime', '模拟时间')}</div>
+            <div className="stat-change">{t('simulation.simTime')}</div>
             <div
               className="stat-value"
               style={{ fontFamily: 'monospace', fontSize: '1.5rem', letterSpacing: '0.5px' }}
@@ -308,7 +308,7 @@ export default function Simulation() {
 
           {/* 交易日历状态徽章 */}
           <div>
-            <div className="stat-change">{t('simulation.marketStatus', '市场状态')}</div>
+            <div className="stat-change">{t('simulation.marketStatus')}</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
               <span className={`tag ${marketTagClass(status?.market_status)}`}>
                 {status?.market_status ?? '—'}
@@ -319,34 +319,34 @@ export default function Simulation() {
               ) : null}
             </div>
             <div className="stat-change">
-              {t('simulation.nextTradingDay', '下一个交易日')}: {status?.next_trading_day ?? '—'}
+              {t('simulation.nextTradingDay')}: {status?.next_trading_day ?? '—'}
             </div>
           </div>
 
           <div>
             <div className="stat-value">
-              {t('simulation.dayPrefix', '第')} {status?.current_day ?? 0} {t('overview.day', '天')}
+              {t('simulation.dayPrefix')} {status?.current_day ?? 0} {t('overview.day')}
             </div>
             <div className="stat-change">
               {status?.is_trading_day === undefined
                 ? ''
                 : status.is_trading_day
-                  ? t('simulation.tradingDay', '交易日')
-                  : t('simulation.nonTradingDay', '非交易日')}
+                  ? t('simulation.tradingDay')
+                  : t('simulation.nonTradingDay')}
             </div>
           </div>
 
           <div style={{ display: 'flex', gap: 10 }}>
             <button className="btn btn-primary" onClick={togglePlay}>
-              {playing ? t('simulation.pause', '暂停') : t('simulation.play', '播放')}
+              {playing ? t('simulation.pause') : t('simulation.play')}
             </button>
             <button className="btn btn-secondary" onClick={stepOnce}>
-              {t('simulation.step', '执行一步')}
+              {t('simulation.step')}
             </button>
           </div>
 
           <div>
-            <label>{t('simulation.speed', '速度')}: </label>
+            <label>{t('simulation.speed')}: </label>
             <select
               className="input-field"
               value={speed}
@@ -362,7 +362,7 @@ export default function Simulation() {
 
           <div>
             <div className="stat-change">
-              {playing ? t('simulation.running', '运行中') : t('simulation.paused', '已暂停')}
+              {playing ? t('simulation.running') : t('simulation.paused')}
             </div>
           </div>
         </div>
@@ -373,7 +373,7 @@ export default function Simulation() {
       <div className="grid-2">
         <div className="card">
           <div className="card-header">
-            <span className="card-title">{t('overview.marketRegime', '市场状态')}</span>
+            <span className="card-title">{t('overview.marketRegime')}</span>
             {economy && <span className="tag tag-blue">{economy.cycle_phase}</span>}
           </div>
           {economyError ? (
@@ -382,57 +382,57 @@ export default function Simulation() {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>{t('simulation.metric', '指标')}</th>
-                  <th>{t('markets.price', '数值')}</th>
+                  <th>{t('simulation.metric')}</th>
+                  <th>{t('markets.price')}</th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
-                  <td>{t('simulation.cyclePhase', '周期阶段')}</td>
+                  <td>{t('simulation.cyclePhase')}</td>
                   <td>{economy.cycle_phase}</td>
                 </tr>
                 <tr>
-                  <td>{t('simulation.gdpGrowth', 'GDP 增速')}</td>
+                  <td>{t('simulation.gdpGrowth')}</td>
                   <td className={economy.gdp_growth >= 0 ? 'positive' : 'negative'}>
                     {pct(economy.gdp_growth)}
                   </td>
                 </tr>
                 <tr>
-                  <td>{t('simulation.inflation', '通胀率')}</td>
+                  <td>{t('simulation.inflation')}</td>
                   <td>{pct(economy.inflation)}</td>
                 </tr>
                 <tr>
-                  <td>{t('simulation.unemployment', '失业率')}</td>
+                  <td>{t('simulation.unemployment')}</td>
                   <td>{pct(economy.unemployment)}</td>
                 </tr>
                 <tr>
-                  <td>{t('simulation.interestRate', '利率')}</td>
+                  <td>{t('simulation.interestRate')}</td>
                   <td>{pct(economy.interest_rate)}</td>
                 </tr>
               </tbody>
             </table>
           ) : (
-            <div className="loading" style={{ padding: 16 }}>{t('common.noData', '暂无数据')}</div>
+            <div className="loading" style={{ padding: 16 }}>{t('common.noData')}</div>
           )}
         </div>
 
         <div className="card">
           <div className="card-header">
-            <span className="card-title">{t('simulation.todayEvents', '今日事件')}</span>
+            <span className="card-title">{t('simulation.todayEvents')}</span>
             <span className="tag tag-gray">{events.length}</span>
           </div>
           {eventsError ? (
             <div className="error" style={{ padding: 16 }}>{eventsError}</div>
           ) : events.length === 0 ? (
-            <div className="loading" style={{ padding: 16 }}>{t('common.noData', '暂无数据')}</div>
+            <div className="loading" style={{ padding: 16 }}>{t('common.noData')}</div>
           ) : (
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>{t('simulation.eventTime', '时间')}</th>
-                  <th>{t('simulation.eventTitle', '事件')}</th>
-                  <th>{t('simulation.eventType', '类型')}</th>
-                  <th>{t('simulation.severity', '强度')}</th>
+                  <th>{t('simulation.eventTime')}</th>
+                  <th>{t('simulation.eventTitle')}</th>
+                  <th>{t('simulation.eventType')}</th>
+                  <th>{t('simulation.severity')}</th>
                 </tr>
               </thead>
               <tbody>

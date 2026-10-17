@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { t } from '../i18n'
 import { useCurrentWorld } from '../hooks/useCurrentWorld'
@@ -21,7 +22,7 @@ interface Commodity {
 }
 
 const CATEGORY_NAMES: Record<string, string> = {
-  ALL: t('commodities.all', '全部'),
+  ALL: t('commodities.all'),
   ENERGY: t('commodities.energy'),
   METAL: t('commodities.metals'),
   AGRICULTURE: t('commodities.agriculture'),
@@ -30,6 +31,7 @@ const CATEGORY_NAMES: Record<string, string> = {
 
 export default function Commodities() {
   const { worldId } = useCurrentWorld()
+  const navigate = useNavigate()
   const [commodities, setCommodities] = useState<Commodity[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -80,7 +82,7 @@ export default function Commodities() {
       <div>
         <div className="page-header">
           <h2>{t('commodities.title')}</h2>
-          <p className="subtitle">{t('commodities.subtitle', '全球商品市场')} · <span className="data-source simulated">{t('commodities.simulated', '模拟数据')}</span></p>
+          <p className="subtitle">{t('commodities.subtitle')} · <span className="data-source simulated">{t('commodities.simulated')}</span></p>
         </div>
         <div className="card"><div className="loading" style={{ padding: 40 }}>{t('common.loading')}</div></div>
       </div>
@@ -92,7 +94,7 @@ export default function Commodities() {
       <div>
         <div className="page-header">
           <h2>{t('commodities.title')}</h2>
-          <p className="subtitle">{t('commodities.subtitle', '全球商品市场')} · <span className="data-source simulated">{t('commodities.simulated', '模拟数据')}</span></p>
+          <p className="subtitle">{t('commodities.subtitle')} · <span className="data-source simulated">{t('commodities.simulated')}</span></p>
         </div>
         <div className="card"><div className="error" style={{ padding: 40 }}>{error}</div></div>
       </div>
@@ -103,12 +105,12 @@ export default function Commodities() {
     <div>
       <div className="page-header">
         <h2>{t('commodities.title')}</h2>
-        <p className="subtitle">{t('commodities.subtitle', '全球商品市场')} · {commodities.length} commodities</p>
+        <p className="subtitle">{t('commodities.subtitle')} · {commodities.length} commodities</p>
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="card-header">
-          <span className="card-title">{t('commodities.categories', '分类')}</span>
+          <span className="card-title">{t('commodities.categories')}</span>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button
@@ -123,7 +125,7 @@ export default function Commodities() {
               fontSize: 13,
             }}
           >
-            {t('commodities.all', '全部')}
+            {t('commodities.all')}
           </button>
           {categories.map(cat => (
             <button
@@ -147,7 +149,7 @@ export default function Commodities() {
 
       <div className="card">
         <div className="card-header">
-          <span className="card-title">{t('commodities.allCommodities', '所有商品')}</span>
+          <span className="card-title">{t('commodities.allCommodities')}</span>
           <span className="tag tag-blue">LIVE</span>
         </div>
         <table className="data-table">
@@ -155,16 +157,21 @@ export default function Commodities() {
             <tr>
               <th>{t('equities.ticker')}</th>
               <th>{t('equities.name')}</th>
-              <th>{t('commodities.category', '分类')}</th>
+              <th>{t('commodities.category')}</th>
               <th>{t('equities.price')}</th>
               <th>{t('equities.change')}</th>
-              <th>{t('commodities.volatility', '波动率')}</th>
-              <th>{t('commodities.supplyDemand', '供需')}</th>
+              <th>{t('commodities.volatility')}</th>
+              <th>{t('commodities.supplyDemand')}</th>
             </tr>
           </thead>
           <tbody>
             {filtered.map(comm => (
-              <tr key={comm.ticker}>
+              <tr
+                key={comm.ticker}
+                style={{ cursor: 'pointer' }}
+                onClick={() => navigate(`/asset/${encodeURIComponent(comm.ticker)}`)}
+                title={t('assetDetail.viewDetail')}
+              >
                 <td>{comm.ticker}</td>
                 <td>{comm.name}</td>
                 <td>

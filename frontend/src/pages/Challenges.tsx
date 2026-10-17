@@ -60,10 +60,10 @@ function toErrorMessage(err: unknown): string {
   if (axios.isAxiosError(err)) {
     const detail = (err.response?.data as { detail?: unknown } | undefined)?.detail
     if (typeof detail === 'string' && detail.trim()) return detail
-    return `${t('common.error', 'Error')}: ${err.message}`
+    return `${t('common.error')}: ${err.message}`
   }
-  if (err instanceof Error) return `${t('common.error', 'Error')}: ${err.message}`
-  return t('common.error', 'Error')
+  if (err instanceof Error) return `${t('common.error')}: ${err.message}`
+  return t('common.error')
 }
 
 const STATUS_TAG_CLASS: Record<string, string> = {
@@ -97,7 +97,7 @@ export default function Challenges() {
       const res = await axios.get<ChallengeTemplate[]>('/api/v1/challenges/templates')
       setTemplates(Array.isArray(res.data) ? res.data : [])
     } catch {
-      setTemplatesError(t('common.dataError', '数据加载失败'))
+      setTemplatesError(t('common.dataError'))
     } finally {
       setTemplatesLoading(false)
     }
@@ -110,7 +110,7 @@ export default function Challenges() {
       const res = await axios.get<WorldChallenge[]>(`/api/v1/challenges/world/${worldId}`)
       setChallenges(Array.isArray(res.data) ? res.data : [])
     } catch {
-      setChallengesError(t('common.dataError', '数据加载失败'))
+      setChallengesError(t('common.dataError'))
     } finally {
       setChallengesLoading(false)
     }
@@ -137,7 +137,7 @@ export default function Challenges() {
           description: template.description,
         },
       })
-      toast.success(`${template.title} ${t('challenges.started', '挑战已开始')}`)
+      toast.success(`${template.title} ${t('challenges.started')}`)
       await loadChallenges()
     } catch (err) {
       toast.error(toErrorMessage(err))
@@ -161,22 +161,22 @@ export default function Challenges() {
       setProgress(Array.isArray(res.data) ? res.data : [])
     } catch {
       setProgress([])
-      setProgressError(t('common.dataError', '数据加载失败'))
+      setProgressError(t('common.dataError'))
     } finally {
       setProgressLoading(false)
     }
   }
 
   const statusLabel = (status: string): string => {
-    if (status === 'completed') return t('challenges.statusCompleted', '已完成')
-    if (status === 'active') return t('challenges.statusActive', '进行中')
+    if (status === 'completed') return t('challenges.statusCompleted')
+    if (status === 'active') return t('challenges.statusActive')
     return status
   }
 
   const header = (
     <div className="page-header">
       <h2>🏆 {t('challenges.title')}</h2>
-      <p className="subtitle">{t('challenges.subtitle', '完成指定投资目标，测试交易技能')}</p>
+      <p className="subtitle">{t('challenges.subtitle')}</p>
     </div>
   )
 
@@ -187,7 +187,7 @@ export default function Challenges() {
       {/* 挑战模板 */}
       <div className="card">
         <div className="card-header">
-          <span className="card-title">{t('challenges.templates', '挑战模板')}</span>
+          <span className="card-title">{t('challenges.templates')}</span>
           <button className="btn btn-sm" onClick={loadTemplates}>{t('common.refresh')}</button>
         </div>
         {templatesLoading ? (
@@ -196,7 +196,7 @@ export default function Challenges() {
           <div className="error" style={{ padding: 20 }}>{templatesError}</div>
         ) : templates.length === 0 ? (
           <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-secondary)' }}>
-            {t('common.noData', '暂无数据')}
+            {t('common.noData')}
           </div>
         ) : (
           <div className="grid-3" style={{ padding: 20 }}>
@@ -207,12 +207,12 @@ export default function Challenges() {
                   {template.description}
                 </p>
                 <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 8 }}>
-                  {t('challenges.targetDays', '目标天数')}: <strong>{template.target_days}</strong>
+                  {t('challenges.targetDays')}: <strong>{template.target_days}</strong>
                   {' · '}
-                  {t('challenges.reward', '奖励')}: <strong>{template.reward}</strong>
+                  {t('challenges.reward')}: <strong>{template.reward}</strong>
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 12 }}>
-                  {t('challenges.constraints', '挑战条件')}: {formatConstraints(template.constraints)}
+                  {t('challenges.constraints')}: {formatConstraints(template.constraints)}
                 </div>
                 <button
                   className="btn btn-primary"
@@ -221,8 +221,8 @@ export default function Challenges() {
                   onClick={() => startChallenge(template)}
                 >
                   {startingId === template.id
-                    ? t('common.loading', '加载中...')
-                    : t('challenges.start', '开始挑战')}
+                    ? t('common.loading')
+                    : t('challenges.start')}
                 </button>
               </div>
             ))}
@@ -233,7 +233,7 @@ export default function Challenges() {
       {/* 进行中的挑战 */}
       <div className="card" style={{ marginTop: 20 }}>
         <div className="card-header">
-          <span className="card-title">{t('challenges.yourProgress', '您的进度')}</span>
+          <span className="card-title">{t('challenges.yourProgress')}</span>
           <button className="btn btn-sm" onClick={loadChallenges}>{t('common.refresh')}</button>
         </div>
         {challengesLoading ? (
@@ -242,7 +242,7 @@ export default function Challenges() {
           <div className="error" style={{ padding: 20 }}>{challengesError}</div>
         ) : challenges.length === 0 ? (
           <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-secondary)' }}>
-            {t('challenges.noChallenges', '暂无进行中的挑战，选择一个模板开始吧')}
+            {t('challenges.noChallenges')}
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -262,8 +262,8 @@ export default function Challenges() {
                   </div>
                   <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
                     {expandedId === challenge.id
-                      ? t('challenges.hideProgress', '收起进度')
-                      : t('challenges.viewProgress', '查看进度')}
+                      ? t('challenges.hideProgress')
+                      : t('challenges.viewProgress')}
                   </span>
                 </div>
                 {challenge.description && (
@@ -272,18 +272,18 @@ export default function Challenges() {
                   </div>
                 )}
                 <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 6 }}>
-                  {t('challenges.targetDays', '目标天数')}: {challenge.target_days}
+                  {t('challenges.targetDays')}: {challenge.target_days}
                   {' · '}
-                  {t('challenges.createdAt', '创建时间')}: {formatDateTime(challenge.created_at)}
+                  {t('challenges.createdAt')}: {formatDateTime(challenge.created_at)}
                   {challenge.completed_at
-                    ? ` · ${t('challenges.completedAt', '完成时间')}: ${formatDateTime(challenge.completed_at)}`
+                    ? ` · ${t('challenges.completedAt')}: ${formatDateTime(challenge.completed_at)}`
                     : ''}
                 </div>
 
                 {expandedId === challenge.id && (
                   <div style={{ marginTop: 12, borderTop: '1px solid var(--border-color)', paddingTop: 12 }}>
                     <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>
-                      {t('challenges.progressTitle', '挑战进度')}
+                      {t('challenges.progressTitle')}
                     </div>
                     {progressLoading ? (
                       <div className="loading" style={{ padding: 16 }}>{t('common.loading')}</div>
@@ -291,22 +291,22 @@ export default function Challenges() {
                       <div className="error" style={{ padding: 12 }}>{progressError}</div>
                     ) : progress.length === 0 ? (
                       <div style={{ padding: 16, textAlign: 'center', color: 'var(--text-secondary)', fontSize: 13 }}>
-                        {t('challenges.noProgress', '该挑战还没有进度记录')}
+                        {t('challenges.noProgress')}
                       </div>
                     ) : (
                       <table className="data-table">
                         <thead>
                           <tr>
-                            <th>{t('simulation.dayPrefix', '第')}</th>
-                            <th>{t('challenges.notes', '备注')}</th>
-                            <th>{t('challenges.recordedAt', '记录时间')}</th>
+                            <th>{t('simulation.dayPrefix')}</th>
+                            <th>{t('challenges.notes')}</th>
+                            <th>{t('challenges.recordedAt')}</th>
                           </tr>
                         </thead>
                         <tbody>
                           {progress.map((entry, index) => (
                             <tr key={`${entry.day}-${index}`}>
                               <td>
-                                {t('challenges.day', '第')} {entry.day} {t('challenges.daySuffix', '天')}
+                                {t('challenges.day')} {entry.day} {t('challenges.daySuffix')}
                               </td>
                               <td>
                                 {entry.notes && entry.notes.trim()

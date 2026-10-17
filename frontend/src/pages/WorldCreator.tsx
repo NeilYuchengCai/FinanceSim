@@ -53,10 +53,10 @@ function toErrorMessage(err: unknown): string {
   if (axios.isAxiosError(err)) {
     const detail = (err.response?.data as { detail?: unknown } | undefined)?.detail
     if (typeof detail === 'string' && detail.trim()) return detail
-    return `${t('common.error', 'Error')}: ${err.message}`
+    return `${t('common.error')}: ${err.message}`
   }
-  if (err instanceof Error) return `${t('common.error', 'Error')}: ${err.message}`
-  return t('common.error', 'Error')
+  if (err instanceof Error) return `${t('common.error')}: ${err.message}`
+  return t('common.error')
 }
 
 export default function WorldCreator() {
@@ -97,7 +97,7 @@ export default function WorldCreator() {
   const selectWorld = (worldId: number) => {
     setWorldId(worldId)
     const target = worlds.find(w => w.id === worldId)
-    toast.success(`${target ? target.name : `#${worldId}`} ${t('world.selected', 'selected as current world')}`)
+    toast.success(`${target ? target.name : `#${worldId}`} ${t('world.selected')}`)
   }
 
   const createWorld = async (mode: string, fallbackName: string) => {
@@ -113,7 +113,7 @@ export default function WorldCreator() {
       if (res.data && Number.isFinite(res.data.id)) {
         setWorldId(res.data.id)
       }
-      toast.success(`${name} ${t('world.created', 'created')}`)
+      toast.success(`${name} ${t('world.created')}`)
     } catch (err) {
       toast.error(toErrorMessage(err))
     } finally {
@@ -124,8 +124,8 @@ export default function WorldCreator() {
   const deleteWorld = async (world: World) => {
     const isDefault = world.id === DEFAULT_WORLD_ID
     const message = isDefault
-      ? `${t('world.confirmDeleteDefault', 'Delete the default world')} "${world.name}"? ${t('world.confirmDeleteHint', 'Existing data is attached to world 1 and may stop loading.')}`
-      : `${t('world.confirmDelete', 'Delete world')} "${world.name}"?`
+      ? `${t('world.confirmDeleteDefault')} "${world.name}"? ${t('world.confirmDeleteHint')}`
+      : `${t('world.confirmDelete')} "${world.name}"?`
 
     if (!window.confirm(message)) return
 
@@ -137,7 +137,7 @@ export default function WorldCreator() {
       if (world.id === currentWorldId) {
         setWorldId(DEFAULT_WORLD_ID)
       }
-      toast.success(`${world.name} ${t('world.deleted', 'deleted')}`)
+      toast.success(`${world.name} ${t('world.deleted')}`)
     } catch (err) {
       toast.error(toErrorMessage(err))
     } finally {
@@ -148,16 +148,16 @@ export default function WorldCreator() {
   return (
     <div>
       <div className="page-header">
-        <h2>🌐 {t('world.title', 'World Creator')}</h2>
+        <h2>🌐 {t('world.title')}</h2>
         <p className="subtitle">
-          {t('world.subtitle', 'Create, manage and switch between simulation worlds')}
+          {t('world.subtitle')}
         </p>
       </div>
 
       <div className="card" style={{ marginBottom: 20 }}>
         <div className="card-header">
-          <span className="card-title">{t('world.createTitle', 'Create a New World')}</span>
-          <span className="tag tag-blue">{t('world.selectHint', 'Pick a mode to start')}</span>
+          <span className="card-title">{t('world.createTitle')}</span>
+          <span className="tag tag-blue">{t('world.selectHint')}</span>
         </div>
         <div className="grid-3" style={{ padding: 20 }}>
           {MODE_CARDS.map(item => (
@@ -177,7 +177,7 @@ export default function WorldCreator() {
               <h3 style={{ margin: '0 0 8px' }}>{t(item.labelKey, item.fallback)}</h3>
               <p style={{ color: 'var(--text-secondary)', fontSize: 13 }}>
                 {creatingMode === item.mode
-                  ? t('common.loading', 'Loading...')
+                  ? t('common.loading')
                   : t(item.descKey, item.descFallback)}
               </p>
             </div>
@@ -187,13 +187,13 @@ export default function WorldCreator() {
 
       <div className="card">
         <div className="card-header">
-          <span className="card-title">{t('world.worlds', 'Worlds')}</span>
+          <span className="card-title">{t('world.worlds')}</span>
           <span className="tag tag-blue">{loading ? '...' : worlds.length}</span>
         </div>
 
         {loading ? (
           <div className="loading" style={{ padding: 40 }}>
-            {t('common.loading', 'Loading...')}
+            {t('common.loading')}
           </div>
         ) : error ? (
           <div style={{ padding: 20 }}>
@@ -209,25 +209,25 @@ export default function WorldCreator() {
               {error}
             </div>
             <button className="btn" style={{ marginTop: 12 }} onClick={() => loadWorlds()}>
-              {t('common.retry', 'Retry')}
+              {t('common.retry')}
             </button>
           </div>
         ) : worlds.length === 0 ? (
           <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-secondary)' }}>
-            {t('world.noWorlds', 'No worlds yet. Pick a mode above to create one.')}
+            {t('world.noWorlds')}
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table className="data-table" style={{ width: '100%' }}>
               <thead>
                 <tr>
-                  <th>{t('world.fieldId', 'ID')}</th>
-                  <th>{t('world.fieldName', 'Name')}</th>
-                  <th>{t('world.fieldMode', 'Mode')}</th>
-                  <th>{t('world.fieldSeed', 'Seed')}</th>
-                  <th>{t('world.fieldDay', 'Day')}</th>
-                  <th>{t('world.fieldCreated', 'Created')}</th>
-                  <th>{t('world.fieldActions', 'Actions')}</th>
+                  <th>{t('world.fieldId')}</th>
+                  <th>{t('world.fieldName')}</th>
+                  <th>{t('world.fieldMode')}</th>
+                  <th>{t('world.fieldSeed')}</th>
+                  <th>{t('world.fieldDay')}</th>
+                  <th>{t('world.fieldCreated')}</th>
+                  <th>{t('world.fieldActions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -248,7 +248,7 @@ export default function WorldCreator() {
                         <strong>{world.name}</strong>
                         {isCurrent && (
                           <span className="tag tag-blue" style={{ marginLeft: 8 }}>
-                            {t('world.current', 'Current')}
+                            {t('world.current')}
                           </span>
                         )}
                       </td>
@@ -274,8 +274,8 @@ export default function WorldCreator() {
                           }}
                         >
                           {deletingId === world.id
-                            ? t('common.loading', 'Loading...')
-                            : t('common.delete', 'Delete')}
+                            ? t('common.loading')
+                            : t('common.delete')}
                         </button>
                       </td>
                     </tr>

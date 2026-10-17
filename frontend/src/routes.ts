@@ -30,6 +30,7 @@ export const lazyLargePages = {
   Challenges: () => import('./pages/Challenges'),
   Timeline: () => import('./pages/Timeline'),
   WorldCreator: () => import('./pages/WorldCreator'),
+  AssetDetail: () => import('./pages/AssetDetail'),
 }
 
 // 合并所有路由

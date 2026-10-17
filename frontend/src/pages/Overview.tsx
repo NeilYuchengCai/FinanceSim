@@ -86,7 +86,7 @@ export default function Overview() {
             </span>
           </div>
           <div className="stat-value">{formatPercent(macro.gdp_growth || 0)}</div>
-          <div className="stat-change">{t('overview.annualRate', '年度增长率')}</div>
+          <div className="stat-change">{t('overview.annualRate')}</div>
         </div>
 
         <div className="card">
@@ -97,7 +97,7 @@ export default function Overview() {
             </span>
           </div>
           <div className="stat-value">{formatPercent(macro.inflation || 0)}</div>
-          <div className="stat-change">{t('overview.inflationTarget', '目标: 2.0%')}</div>
+          <div className="stat-change">{t('overview.inflationTarget')}</div>
         </div>
 
         <div className="card">
@@ -106,7 +106,7 @@ export default function Overview() {
             <span className="tag tag-blue">{formatPercent(macro.unemployment || 0)}</span>
           </div>
           <div className="stat-value">{formatPercent(macro.unemployment || 0)}</div>
-          <div className="stat-change">{t('overview.naturalRate', '自然率: 5.0%')}</div>
+          <div className="stat-change">{t('overview.naturalRate')}</div>
         </div>
 
         <div className="card">
@@ -115,7 +115,7 @@ export default function Overview() {
             <span className="tag tag-blue">{formatPercent(macro.interest_rate || 0)}</span>
           </div>
           <div className="stat-value">{formatPercent(macro.interest_rate || 0)}</div>
-          <div className="stat-change">{t('overview.policyRate', '政策利率')}</div>
+          <div className="stat-change">{t('overview.policyRate')}</div>
         </div>
         </>
         )}
@@ -124,25 +124,25 @@ export default function Overview() {
       <div className="grid-2">
         <div className="card">
           <div className="card-header">
-            <span className="card-title">{t('overview.marketRegime', '市场状态')}</span>
+            <span className="card-title">{t('overview.marketRegime')}</span>
             <span className="tag tag-purple">{macro?.cycle_phase || 'UNKNOWN'}</span>
           </div>
           <div style={{ padding: 20, textAlign: 'center' }}>
             <div style={{ fontSize: '3rem', fontWeight: 600 }}>{macro?.cycle_phase || '--'}</div>
-            <div style={{ color: 'var(--text-secondary)' }}>{t('overview.economicPhase', '经济阶段')}: {macro?.cycle_phase || '--'}</div>
+            <div style={{ color: 'var(--text-secondary)' }}>{t('overview.economicPhase')}: {macro?.cycle_phase || '--'}</div>
           </div>
         </div>
         
         <div className="card">
           <div className="card-header">
-            <span className="card-title">{t('overview.economicIndicators', '经济指标')}</span>
+            <span className="card-title">{t('overview.economicIndicators')}</span>
           </div>
           <table className="data-table">
             <thead>
               <tr>
-                <th>{t('overview.metric', '指标')}</th>
-                <th>{t('overview.value', '数值')}</th>
-                <th>{t('overview.status', '状态')}</th>
+                <th>{t('overview.metric')}</th>
+                <th>{t('overview.value')}</th>
+                <th>{t('overview.status')}</th>
               </tr>
             </thead>
             <tbody>
@@ -150,27 +150,27 @@ export default function Overview() {
                 <td>{t('overview.gdp')}</td>
                 <td>{formatPercent(macro?.gdp_growth || 0)}</td>
                 <td className={macro?.gdp_growth && macro.gdp_growth >= 0 ? 'positive' : 'negative'}>
-                  {macro?.gdp_growth && macro.gdp_growth >= 0 ? '↑ ↑ ' + t('overview.expanding', '扩张') : '↓ ↓ ' + t('overview.contracting', '收缩')}
+                  {macro?.gdp_growth && macro.gdp_growth >= 0 ? '↑ ↑ ' + t('overview.expanding') : '↓ ↓ ' + t('overview.contracting')}
                 </td>
               </tr>
               <tr>
                 <td>{t('overview.inflation')}</td>
                 <td>{formatPercent(macro?.inflation || 0)}</td>
                 <td className={(macro?.inflation || 0) <= 0.02 ? 'positive' : 'negative'}>
-                  {(macro?.inflation || 0) <= 0.02 ? '✓ ' + t('overview.target', '达标') : '⚠ ' + t('overview.high', '偏高')}
+                  {(macro?.inflation || 0) <= 0.02 ? '✓ ' + t('overview.target') : '⚠ ' + t('overview.high')}
                 </td>
               </tr>
               <tr>
                 <td>{t('overview.unemployment')}</td>
                 <td>{formatPercent(macro?.unemployment || 0)}</td>
                 <td className={(macro?.unemployment || 0) <= 0.05 ? 'positive' : 'negative'}>
-                  {(macro?.unemployment || 0) <= 0.05 ? '✓ ' + t('overview.healthy', '健康') : '⚠ ' + t('overview.elevated', '偏高')}
+                  {(macro?.unemployment || 0) <= 0.05 ? '✓ ' + t('overview.healthy') : '⚠ ' + t('overview.elevated')}
                 </td>
               </tr>
               <tr>
                 <td>{t('overview.interestRate')}</td>
                 <td>{formatPercent(macro?.interest_rate || 0)}</td>
-                <td><span className="tag tag-blue">{t('overview.current', '当前')}</span></td>
+                <td><span className="tag tag-blue">{t('overview.current')}</span></td>
               </tr>
             </tbody>
           </table>
@@ -179,16 +179,16 @@ export default function Overview() {
       
       <div className="card">
         <div className="card-header">
-          <span className="card-title">{t('overview.breakingNews', '突发新闻')}</span>
+          <span className="card-title">{t('overview.breakingNews')}</span>
           <span className="tag tag-red">LIVE</span>
         </div>
         <table className="data-table">
           <thead>
             <tr>
-              <th>{t('overview.time', '时间')}</th>
-              <th>{t('overview.headline', '标题')}</th>
-              <th>{t('overview.importance', '重要性')}</th>
-              <th>{t('overview.assets', '影响资产')}</th>
+              <th>{t('overview.time')}</th>
+              <th>{t('overview.headline')}</th>
+              <th>{t('overview.importance')}</th>
+              <th>{t('overview.assets')}</th>
             </tr>
           </thead>
           <tbody>

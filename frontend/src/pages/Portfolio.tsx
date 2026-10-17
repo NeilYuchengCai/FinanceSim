@@ -73,7 +73,7 @@ export default function Portfolio() {
       setSummary(summaryRes.data)
       setPositions(Array.isArray(positionsRes.data) ? positionsRes.data : [])
     } catch {
-      setError(t('common.dataError', '数据加载失败'))
+      setError(t('common.dataError'))
     } finally {
       setLoading(false)
     }
@@ -122,7 +122,7 @@ export default function Portfolio() {
   const header = (
     <div className="page-header">
       <h2>{t('portfolio.title')}</h2>
-      <p className="subtitle">{t('portfolio.subtitle', '资产管理和绩效分析')}</p>
+      <p className="subtitle">{t('portfolio.subtitle')}</p>
     </div>
   )
 
@@ -144,7 +144,7 @@ export default function Portfolio() {
         <div className="card">
           <div className="error" style={{ padding: 40 }}>{error}</div>
           <button className="btn" style={{ marginTop: 12 }} onClick={load}>
-            {t('common.retry', '重试')}
+            {t('common.retry')}
           </button>
         </div>
       </div>
@@ -176,7 +176,7 @@ export default function Portfolio() {
           <div className="stat-change">
             {t('portfolio.totalReturn')}
             <span style={{ color: 'var(--text-secondary)' }}>
-              {' '}· {t('portfolio.returnNote', '按初始资金 $100,000 计算')}
+              {' '}· {t('portfolio.returnNote')}
             </span>
           </div>
         </div>
@@ -191,13 +191,13 @@ export default function Portfolio() {
           <div style={{ padding: 40, textAlign: 'center' }}>
             <div style={{ fontSize: 40, marginBottom: 12 }}>💼</div>
             <div style={{ color: 'var(--text-secondary)', marginBottom: 12 }}>
-              {t('portfolio.noPositions', '暂无持仓')}
+              {t('portfolio.noPositions')}
             </div>
             <div style={{ color: 'var(--text-secondary)', fontSize: 13, marginBottom: 16 }}>
-              {t('portfolio.noPositionsHint', '还没有任何持仓，去订单页提交第一笔交易吧')}
+              {t('portfolio.noPositionsHint')}
             </div>
             <Link className="btn btn-primary" to="/orders">
-              {t('portfolio.goToOrders', '前往下单')}
+              {t('portfolio.goToOrders')}
             </Link>
           </div>
         ) : (
@@ -205,17 +205,17 @@ export default function Portfolio() {
             <thead>
               <tr>
                 <th>{t('equities.ticker')}</th>
-                <th>{t('portfolio.quantity', '数量')}</th>
-                <th>{t('portfolio.avgPrice', '均价')}</th>
+                <th>{t('portfolio.quantity')}</th>
+                <th>{t('portfolio.avgPrice')}</th>
                 <th>
-                  {t('portfolio.currentPrice', '现价')}
+                  {t('portfolio.currentPrice')}
                   <span style={{ color: 'var(--text-secondary)', fontWeight: 400 }}>
-                    {' '}· {t('portfolio.livePrice', '实时')}
+                    {' '}· {t('portfolio.livePrice')}
                   </span>
                 </th>
-                <th>{t('portfolio.marketValue', '市值')}</th>
-                <th>{t('portfolio.pnl', '盈亏')}</th>
-                <th>{t('portfolio.pnlPercent', '盈亏%')}</th>
+                <th>{t('portfolio.marketValue')}</th>
+                <th>{t('portfolio.pnl')}</th>
+                <th>{t('portfolio.pnlPercent')}</th>
               </tr>
             </thead>
             <tbody>

@@ -62,7 +62,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             className={`toast toast-${item.variant}`}
             role="status"
             onClick={() => dismiss(item.id)}
-            title={t('toast.dismiss', '点击关闭')}
+            title={t('toast.dismiss')}
           >
             <span className="toast-icon">{item.variant === 'success' ? '✅' : '⚠️'}</span>
             <span className="toast-message">{item.message}</span>

@@ -20,7 +20,7 @@ const PageLoader = () => (
   }}>
       <div style={{ textAlign: 'center' }}>
         <div style={{ fontSize: '24px', marginBottom: '8px' }}>⏳</div>
-        <div>{t('common.loading', '加载中...')}</div>
+        <div>{t('common.loading')}</div>
       </div>
   </div>
 )
@@ -63,24 +63,24 @@ function App() {
   ])
 
   const navItems = [
-    { path: '/', label: t('nav.overview', '概览'), icon: '📊' },
-    { path: '/markets', label: t('nav.markets', '市场'), icon: '📈' },
-    { path: '/equities', label: t('nav.equities', '股票'), icon: '📉' },
-    { path: '/fx', label: t('nav.fx', '外汇'), icon: '💱' },
-    { path: '/bonds', label: t('nav.bonds', '债券'), icon: '🏛️' },
-    { path: '/commodities', label: t('nav.commodities', '商品'), icon: '🛢️' },
-    { path: '/bots', label: t('nav.bots', 'AI交易员'), icon: '🤖' },
-    { path: '/timeline', label: t('nav.timeline', '时间线'), icon: '⏳' },
-    { path: '/portfolio', label: t('nav.portfolio', '投资组合'), icon: '💼' },
-    { path: '/orders', label: t('nav.orders', '订单'), icon: '📋' },
-    { path: '/news', label: t('nav.news', '新闻'), icon: '📰' },
-    { path: '/search', label: t('nav.search', '搜索'), icon: '🔍' },
-    { path: '/analytics', label: t('nav.analytics', '分析'), icon: '🔬' },
-    { path: '/economy', label: t('nav.economy', '宏观经济'), icon: '🌍' },
-    { path: '/simulation', label: t('nav.simulation', '模拟'), icon: '▶️' },
-    { path: '/challenges', label: t('nav.challenges', '挑战'), icon: '🏆' },
-    { path: '/settings', label: t('nav.settings', '设置'), icon: '⚙️' },
-    { path: '/create-world', label: t('nav.createWorld', '创建世界'), icon: '🌐' },
+    { path: '/', label: t('nav.overview'), icon: '📊' },
+    { path: '/markets', label: t('nav.markets'), icon: '📈' },
+    { path: '/equities', label: t('nav.equities'), icon: '📉' },
+    { path: '/fx', label: t('nav.fx'), icon: '💱' },
+    { path: '/bonds', label: t('nav.bonds'), icon: '🏛️' },
+    { path: '/commodities', label: t('nav.commodities'), icon: '🛢️' },
+    { path: '/bots', label: t('nav.bots'), icon: '🤖' },
+    { path: '/timeline', label: t('nav.timeline'), icon: '⏳' },
+    { path: '/portfolio', label: t('nav.portfolio'), icon: '💼' },
+    { path: '/orders', label: t('nav.orders'), icon: '📋' },
+    { path: '/news', label: t('nav.news'), icon: '📰' },
+    { path: '/search', label: t('nav.search'), icon: '🔍' },
+    { path: '/analytics', label: t('nav.analytics'), icon: '🔬' },
+    { path: '/economy', label: t('nav.economy'), icon: '🌍' },
+    { path: '/simulation', label: t('nav.simulation'), icon: '▶️' },
+    { path: '/challenges', label: t('nav.challenges'), icon: '🏆' },
+    { path: '/settings', label: t('nav.settings'), icon: '⚙️' },
+    { path: '/create-world', label: t('nav.createWorld'), icon: '🌐' },
   ]
 
   // 动态组件映射
@@ -103,6 +103,7 @@ function App() {
     '/challenges': lazy(allLazyRoutes.Challenges),
     '/settings': lazy(allLazyRoutes.Settings),
     '/create-world': lazy(allLazyRoutes.WorldCreator),
+    '/asset/:ticker': lazy(allLazyRoutes.AssetDetail),
   }
 
   return (

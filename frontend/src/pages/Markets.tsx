@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { t } from '../i18n'
 import { LivePrice, LiveChange } from '../components/LiveQuote'
@@ -66,20 +67,28 @@ function dirClass(v: number) {
   return ''
 }
 
+const rowClickStyle = { cursor: 'pointer' }
+
 function QuoteTable({ rows, valueLabel }: { rows: Quote[]; valueLabel: string }) {
-  if (!rows.length) return <div className="loading">{t('common.noData', '暂无数据')}</div>
+  const navigate = useNavigate()
+  if (!rows.length) return <div className="loading">{t('common.noData')}</div>
   return (
     <table className="data-table">
       <thead>
         <tr>
-          <th>{t('markets.code', '代码')}</th>
+          <th>{t('markets.code')}</th>
           <th>{valueLabel}</th>
-          <th>{t('markets.change', '涨跌幅')}</th>
+          <th>{t('markets.change')}</th>
         </tr>
       </thead>
       <tbody>
         {rows.map((r) => (
-          <tr key={r.ticker}>
+          <tr
+            key={r.ticker}
+            style={rowClickStyle}
+            onClick={() => navigate(`/asset/${encodeURIComponent(r.ticker)}`)}
+            title={t('assetDetail.viewDetail')}
+          >
             <td>{r.ticker}</td>
             <td>
               <LivePrice ticker={r.ticker} fallback={r.price} format={(v) => v.toLocaleString()} />
@@ -100,13 +109,14 @@ function LiveStatus() {
   return (
     <span className={`live-status ${live ? 'live-on' : 'live-off'}`} style={{ marginLeft: 10 }}>
       <span className="live-dot" />
-      {live ? t('common.live', '实时行情') : t('common.liveConnecting', '连接中…')}
+      {live ? t('common.live') : t('common.liveConnecting')}
     </span>
   )
 }
 
 export default function Markets() {
   const { worldId } = useCurrentWorld()
+  const navigate = useNavigate()
   const [data, setData] = useState<Breadth | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -118,7 +128,7 @@ export default function Markets() {
       setData(res.data)
       setError(null)
     } catch (err) {
-      setError(t('common.dataError', '数据加载失败'))
+      setError(t('common.dataError'))
     } finally {
       setLoading(false)
     }
@@ -133,8 +143,8 @@ export default function Markets() {
 
   const header = (
     <div className="page-header">
-      <h2>{t('markets.title', '市场概览')}</h2>
-      <p className="subtitle">{t('markets.subtitle', '指数行情、市场广度与板块表现')}</p>
+      <h2>{t('markets.title')}</h2>
+      <p className="subtitle">{t('markets.subtitle')}</p>
       <LiveStatus />
     </div>
   )
@@ -144,7 +154,7 @@ export default function Markets() {
       <div>
         {header}
         <div className="card">
-          <div className="loading" style={{ padding: 40 }}>{t('common.loading', '加载中...')}</div>
+          <div className="loading" style={{ padding: 40 }}>{t('common.loading')}</div>
         </div>
       </div>
     )
@@ -155,7 +165,7 @@ export default function Markets() {
       <div>
         {header}
         <div className="card">
-          <div className="error" style={{ padding: 40 }}>{error || t('common.dataError', '数据加载失败')}</div>
+          <div className="error" style={{ padding: 40 }}>{error || t('common.dataError')}</div>
         </div>
       </div>
     )
@@ -197,35 +207,35 @@ export default function Markets() {
 
       <div className="grid-4">
         <div className="card">
-          <div className="card-header"><span className="card-title">{t('markets.advancing', '上涨家数')}</span></div>
+          <div className="card-header"><span className="card-title">{t('markets.advancing')}</span></div>
           <div className="stat-value positive">{data.advancing}</div>
-          <div className="stat-change">{data.advancers_pct}% {t('markets.ofTotal', '占比')}</div>
+          <div className="stat-change">{data.advancers_pct}% {t('markets.ofTotal')}</div>
         </div>
         <div className="card">
-          <div className="card-header"><span className="card-title">{t('markets.declining', '下跌家数')}</span></div>
+          <div className="card-header"><span className="card-title">{t('markets.declining')}</span></div>
           <div className="stat-value negative">{data.declining}</div>
-          <div className="stat-change">{data.decliners_pct}% {t('markets.ofTotal', '占比')}</div>
+          <div className="stat-change">{data.decliners_pct}% {t('markets.ofTotal')}</div>
         </div>
         <div className="card">
-          <div className="card-header"><span className="card-title">{t('markets.adLine', '腾落线 A-D')}</span></div>
+          <div className="card-header"><span className="card-title">{t('markets.adLine')}</span></div>
           <div className={`stat-value ${dirClass(data.advance_decline_line)}`}>{data.advance_decline_line}</div>
           <div className="stat-change">
-            {t('markets.adRatio', '涨跌比')}: {data.advance_decline_ratio ?? '—'}
+            {t('markets.adRatio')}: {data.advance_decline_ratio ?? '—'}
           </div>
         </div>
         <div className="card">
-          <div className="card-header"><span className="card-title">{t('markets.avgChange', '平均涨跌')}</span></div>
+          <div className="card-header"><span className="card-title">{t('markets.avgChange')}</span></div>
           <div className={`stat-value ${dirClass(data.avg_change_pct)}`}>{pct(data.avg_change_pct)}</div>
           <div className="stat-change">
-            {t('markets.newHighLow', '新高/新低')}: {data.new_highs}/{data.new_lows}
+            {t('markets.newHighLow')}: {data.new_highs}/{data.new_lows}
           </div>
         </div>
       </div>
 
       <div className="card">
         <div className="card-header">
-          <span className="card-title">{t('markets.distribution', '涨跌幅分布')}</span>
-          <span className="tag tag-gray">{data.total_tracked} {t('markets.instruments', '只标的')}</span>
+          <span className="card-title">{t('markets.distribution')}</span>
+          <span className="tag tag-gray">{data.total_tracked} {t('markets.instruments')}</span>
         </div>
         <div style={{ padding: 16 }}>
           {DIST_BUCKETS.map(([key, label]) => {
@@ -251,16 +261,16 @@ export default function Markets() {
 
       <div className="card">
         <div className="card-header">
-          <span className="card-title">{t('markets.sectors', '板块表现')}</span>
+          <span className="card-title">{t('markets.sectors')}</span>
         </div>
         <table className="data-table">
           <thead>
             <tr>
-              <th>{t('markets.sector', '板块')}</th>
-              <th>{t('markets.count', '数量')}</th>
-              <th>{t('markets.advancing', '上涨')}</th>
-              <th>{t('markets.declining', '下跌')}</th>
-              <th>{t('markets.avgChange', '平均涨跌')}</th>
+              <th>{t('markets.sector')}</th>
+              <th>{t('markets.count')}</th>
+              <th>{t('markets.advancing')}</th>
+              <th>{t('markets.declining')}</th>
+              <th>{t('markets.avgChange')}</th>
             </tr>
           </thead>
           <tbody>
@@ -280,34 +290,39 @@ export default function Markets() {
       <div className="grid-3">
         <div className="card">
           <div className="card-header">
-            <span className="card-title">{t('markets.gainers', '涨幅榜')}</span>
+            <span className="card-title">{t('markets.gainers')}</span>
             <span className="tag tag-red">TOP {data.gainers.length}</span>
           </div>
-          <QuoteTable rows={data.gainers} valueLabel={t('markets.price', '现价')} />
+          <QuoteTable rows={data.gainers} valueLabel={t('markets.price')} />
         </div>
         <div className="card">
           <div className="card-header">
-            <span className="card-title">{t('markets.losers', '跌幅榜')}</span>
+            <span className="card-title">{t('markets.losers')}</span>
             <span className="tag tag-green">TOP {data.losers.length}</span>
           </div>
-          <QuoteTable rows={data.losers} valueLabel={t('markets.price', '现价')} />
+          <QuoteTable rows={data.losers} valueLabel={t('markets.price')} />
         </div>
         <div className="card">
           <div className="card-header">
-            <span className="card-title">{t('markets.mostActive', '活跃榜')}</span>
+            <span className="card-title">{t('markets.mostActive')}</span>
             <span className="tag tag-blue">VOL</span>
           </div>
           <table className="data-table">
             <thead>
               <tr>
-                <th>{t('markets.code', '代码')}</th>
-                <th>{t('markets.volume', '成交量')}</th>
-                <th>{t('markets.change', '涨跌幅')}</th>
+                <th>{t('markets.code')}</th>
+                <th>{t('markets.volume')}</th>
+                <th>{t('markets.change')}</th>
               </tr>
             </thead>
             <tbody>
               {data.most_active.map((r) => (
-                <tr key={r.ticker}>
+                <tr
+                  key={r.ticker}
+                  style={rowClickStyle}
+                  onClick={() => navigate(`/asset/${encodeURIComponent(r.ticker)}`)}
+                  title={t('assetDetail.viewDetail')}
+                >
                   <td>{r.ticker}</td>
                   <td>{r.volume.toLocaleString()}</td>
                   <td>
@@ -322,21 +337,26 @@ export default function Markets() {
 
       <div className="card">
         <div className="card-header">
-          <span className="card-title">{t('markets.globalIndices', '全球主要指数')}</span>
+          <span className="card-title">{t('markets.globalIndices')}</span>
           <span className="tag tag-gray">{data.indices.length}</span>
         </div>
         <table className="data-table">
           <thead>
             <tr>
-              <th>{t('markets.code', '代码')}</th>
-              <th>{t('markets.name', '名称')}</th>
-              <th>{t('markets.price', '点位')}</th>
-              <th>{t('markets.change', '涨跌幅')}</th>
+              <th>{t('markets.code')}</th>
+              <th>{t('markets.name')}</th>
+              <th>{t('markets.price')}</th>
+              <th>{t('markets.change')}</th>
             </tr>
           </thead>
           <tbody>
             {data.indices.map((idx) => (
-              <tr key={idx.ticker}>
+              <tr
+                key={idx.ticker}
+                style={rowClickStyle}
+                onClick={() => navigate(`/asset/${encodeURIComponent(idx.ticker)}`)}
+                title={t('assetDetail.viewDetail')}
+              >
                 <td>{idx.ticker}</td>
                 <td>{idx.name}</td>
                 <td>

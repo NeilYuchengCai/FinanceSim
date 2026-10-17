@@ -78,6 +78,26 @@ export const zhCN = {
     neutral: '中性',
     day: '天',
     marketRegime: '市场状态',
+    time: '时间',
+    headline: '标题',
+    importance: '重要性',
+    assets: '影响资产',
+    annualRate: '年度增长率',
+    inflationTarget: '目标: 2.0%',
+    naturalRate: '自然率: 5.0%',
+    policyRate: '政策利率',
+    economicPhase: '经济阶段',
+    economicIndicators: '经济指标',
+    metric: '指标',
+    value: '数值',
+    status: '状态',
+    expanding: '扩张',
+    contracting: '收缩',
+    target: '达标',
+    high: '偏高',
+    healthy: '健康',
+    elevated: '偏高',
+    current: '当前',
   },
   
   // 市场
@@ -160,6 +180,12 @@ export const zhCN = {
     eurUsd: '欧元/美元',
     gbpUsd: '英镑/美元',
     usdChf: '美元/瑞郎',
+    allPairs: '全部货币对',
+    base: '基准',
+    quote: '报价',
+    change24h: '24h涨跌',
+    high24h: '24h最高',
+    low24h: '24h最低',
   },
   
   // 债券
@@ -285,6 +311,8 @@ export const zhCN = {
     pnl: '盈亏',
     risk: '风险',
     positions: '持仓',
+    recentTrades: '成交流水',
+    noTrades: '暂无成交记录，点击"执行一步"让交易员开始工作',
   },
   
   // 投资组合
@@ -344,6 +372,12 @@ export const zhCN = {
     actions: '操作',
     cancel: '取消',
     noOrders: '暂无挂单',
+    direction: '方向',
+    createdAt: '创建时间',
+    tickerRequired: '请输入标的代码',
+    tickerNotFound: '标的不存在',
+    invalidQuantity: '数量必须大于等于 1',
+    invalidPrice: '限价必须大于 0',
   },
   
   // 新闻
@@ -358,6 +392,8 @@ export const zhCN = {
     company: '公司',
     policy: '政策',
     technology: '科技',
+    allNews: '全部新闻',
+    sentiment: '情绪',
   },
   
   // 时间线
@@ -538,8 +574,26 @@ export const zhCN = {
     events: '事件',
     results: '搜索结果',
     noResults: '未找到相关结果',
+    items: '条结果',
+    resultType: '类型',
+    detail: '详情',
+    viewDetail: '查看详情',
   },
   
+  // 资产详情页
+  assetDetail: {
+    basicInfo: '基本信息',
+    orderbook: '订单簿',
+    bids: '买盘',
+    asks: '卖盘',
+    trade: '交易',
+    type: '类型',
+    industry: '行业',
+    currency: '货币',
+    noHistory: '暂无价格历史，模拟推进后将生成 K 线数据',
+    viewDetail: '查看详情',
+  },
+
   // 世界管理
   world: {
     title: '世界管理',
@@ -701,6 +755,26 @@ export const enUS = {
     neutral: 'Neutral',
     day: 'Day',
     marketRegime: 'Market Regime',
+    time: 'Time',
+    headline: 'Headline',
+    importance: 'Importance',
+    assets: 'Affected Assets',
+    annualRate: 'Annual Growth Rate',
+    inflationTarget: 'Target: 2.0%',
+    naturalRate: 'Natural Rate: 5.0%',
+    policyRate: 'Policy Rate',
+    economicPhase: 'Economic Phase',
+    economicIndicators: 'Economic Indicators',
+    metric: 'Metric',
+    value: 'Value',
+    status: 'Status',
+    expanding: 'Expanding',
+    contracting: 'Contracting',
+    target: 'On Target',
+    high: 'High',
+    healthy: 'Healthy',
+    elevated: 'Elevated',
+    current: 'Current',
   },
 
   markets: {
@@ -780,6 +854,12 @@ export const enUS = {
     eurUsd: 'EUR/USD',
     gbpUsd: 'GBP/USD',
     usdChf: 'USD/CHF',
+    allPairs: 'All Pairs',
+    base: 'Base',
+    quote: 'Quote',
+    change24h: '24h Change',
+    high24h: '24h High',
+    low24h: '24h Low',
   },
 
   bonds: {
@@ -901,6 +981,8 @@ export const enUS = {
     pnl: 'P&L',
     risk: 'Risk',
     positions: 'Positions',
+    recentTrades: 'Recent Bot Trades',
+    noTrades: 'No trades yet — hit "Step" to let the traders start working',
   },
 
   portfolio: {
@@ -958,6 +1040,12 @@ export const enUS = {
     actions: 'Actions',
     cancel: 'Cancel',
     noOrders: 'No open orders',
+    direction: 'Side',
+    createdAt: 'Created',
+    tickerRequired: 'Enter a ticker',
+    tickerNotFound: 'Ticker not found',
+    invalidQuantity: 'Quantity must be at least 1',
+    invalidPrice: 'Limit price must be greater than 0',
   },
 
   news: {
@@ -971,6 +1059,8 @@ export const enUS = {
     company: 'Company',
     policy: 'Policy',
     technology: 'Technology',
+    allNews: 'All News',
+    sentiment: 'Sentiment',
   },
 
   timeline: {
@@ -1145,6 +1235,24 @@ export const enUS = {
     events: 'Events',
     results: 'Results',
     noResults: 'No results found',
+    items: 'results',
+    resultType: 'Type',
+    detail: 'Details',
+    viewDetail: 'View details',
+  },
+
+  // Asset detail page
+  assetDetail: {
+    basicInfo: 'Basic Info',
+    orderbook: 'Order Book',
+    bids: 'Bids',
+    asks: 'Asks',
+    trade: 'Trade',
+    type: 'Type',
+    industry: 'Industry',
+    currency: 'Currency',
+    noHistory: 'No price history yet — K-line data appears once the simulation advances',
+    viewDetail: 'View details',
   },
 
   world: {

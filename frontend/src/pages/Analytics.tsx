@@ -76,14 +76,14 @@ function SectionBody({
   empty: boolean
   children: ReactNode
 }) {
-  if (loading) return <div className="loading">{t('common.loading', '加载中...')}</div>
+  if (loading) return <div className="loading">{t('common.loading')}</div>
   if (error)
     return (
       <div className="error" style={{ color: 'var(--accent-red)', padding: 20 }}>
         {error}
       </div>
     )
-  if (empty) return <div className="loading">{t('common.noData', '暂无数据')}</div>
+  if (empty) return <div className="loading">{t('common.noData')}</div>
   return <>{children}</>
 }
 
@@ -102,14 +102,14 @@ function CorrelationGrid({ data }: { data: CorrelationData }) {
   const tickers = data.tickers
   const matrix = data.matrix
   if (!tickers.length || !matrix.length) {
-    return <div className="loading">{t('common.noData', '暂无数据')}</div>
+    return <div className="loading">{t('common.noData')}</div>
   }
   return (
     <div style={{ overflowX: 'auto' }}>
       <table className="data-table">
         <thead>
           <tr>
-            <th>{t('analytics.asset', '标的')}</th>
+            <th>{t('analytics.asset')}</th>
             {tickers.map((tk) => (
               <th key={tk} style={{ textAlign: 'center' }}>
                 {tk}
@@ -211,7 +211,7 @@ export default function Analytics() {
         setPrices(points)
         setPricesError(null)
       } catch {
-        if (!cancelled) setPricesError(t('common.dataError', '数据加载失败'))
+        if (!cancelled) setPricesError(t('common.dataError'))
       } finally {
         if (!cancelled) setPricesLoading(false)
       }
@@ -236,7 +236,7 @@ export default function Analytics() {
         setReturns(list.filter((v): v is number => typeof v === 'number' && Number.isFinite(v)))
         setReturnsError(null)
       } catch {
-        if (!cancelled) setReturnsError(t('common.dataError', '数据加载失败'))
+        if (!cancelled) setReturnsError(t('common.dataError'))
       } finally {
         if (!cancelled) setReturnsLoading(false)
       }
@@ -269,7 +269,7 @@ export default function Analytics() {
         })
         setCorrelationError(null)
       } catch {
-        if (!cancelled) setCorrelationError(t('common.dataError', '数据加载失败'))
+        if (!cancelled) setCorrelationError(t('common.dataError'))
       } finally {
         if (!cancelled) setCorrelationLoading(false)
       }
@@ -357,20 +357,20 @@ export default function Analytics() {
   return (
     <div>
       <div className="page-header">
-        <h2>{t('analytics.title', '分析')}</h2>
-        <p className="subtitle">{t('analytics.subtitle', '深度数据分析')}</p>
+        <h2>{t('analytics.title')}</h2>
+        <p className="subtitle">{t('analytics.subtitle')}</p>
       </div>
 
       <div className="grid-2">
         <div className="card">
           <div className="card-header">
-            <span className="card-title">{t('analytics.returnsAnalysis', '收益分析')}</span>
+            <span className="card-title">{t('analytics.returnsAnalysis')}</span>
             <select
               className="input-field"
               style={{ width: 'auto', padding: '6px 10px' }}
               value={selected}
               onChange={(e) => setSelected(e.target.value)}
-              aria-label={t('analytics.selectAsset', '选择标的')}
+              aria-label={t('analytics.selectAsset')}
             >
               {tickerOptions.map((tk) => (
                 <option key={tk} value={tk}>
@@ -402,7 +402,7 @@ export default function Analytics() {
                       stroke="#58a6ff"
                       strokeWidth={2}
                       dot={false}
-                      name={t('analytics.cumulativeReturn', '累计收益率')}
+                      name={t('analytics.cumulativeReturn')}
                     />
                   </LineChart>
                 </ResponsiveContainer>
@@ -410,12 +410,12 @@ export default function Analytics() {
               {performance && (
                 <div style={{ ...metricGridStyle, marginTop: 12 }}>
                   <Metric
-                    label={t('analytics.totalReturn', '区间总收益率')}
+                    label={t('analytics.totalReturn')}
                     value={pct(performance.total)}
                     tone={dirClass(performance.total)}
                   />
                   <Metric
-                    label={t('analytics.annualizedReturn', '年化收益率')}
+                    label={t('analytics.annualizedReturn')}
                     value={pct(performance.annualized)}
                     tone={dirClass(performance.annualized)}
                   />
@@ -427,7 +427,7 @@ export default function Analytics() {
 
         <div className="card">
           <div className="card-header">
-            <span className="card-title">{t('analytics.riskMetrics', '风险指标')}</span>
+            <span className="card-title">{t('analytics.riskMetrics')}</span>
             <span className="tag tag-gray">{selected}</span>
           </div>
           <SectionBody
@@ -438,31 +438,31 @@ export default function Analytics() {
             <>
               <div style={metricGridStyle}>
                 <Metric
-                  label={t('analytics.annualizedVolatility', '年化波动率')}
+                  label={t('analytics.annualizedVolatility')}
                   value={toPercent(riskMetrics?.annualizedVol ?? 0)}
                 />
                 <Metric
-                  label={t('analytics.sharpeRatio', '夏普比率')}
+                  label={t('analytics.sharpeRatio')}
                   value={(riskMetrics?.sharpe ?? 0).toFixed(2)}
                   tone={dirClass(riskMetrics?.sharpe ?? 0)}
                 />
                 <Metric
-                  label={t('analytics.maxDrawdown', '最大回撤')}
+                  label={t('analytics.maxDrawdown')}
                   value={toPercent(riskMetrics?.maxDrawdown ?? 0)}
                   tone="negative"
                 />
                 <Metric
-                  label={t('analytics.var95', '95% 单日 VaR')}
+                  label={t('analytics.var95')}
                   value={toPercent(riskMetrics?.var95 ?? 0)}
                   tone="negative"
                 />
                 <Metric
-                  label={t('analytics.positiveDays', '正收益天数占比')}
+                  label={t('analytics.positiveDays')}
                   value={toPercent(riskMetrics?.positiveDays ?? 0)}
                 />
               </div>
               <div style={{ marginTop: 12, fontSize: 12, color: 'var(--text-secondary)' }}>
-                {t('analytics.riskFreeRate', '无风险利率')} 2% · {t('analytics.sampleDays', '样本天数')}{' '}
+                {t('analytics.riskFreeRate')} 2% · {t('analytics.sampleDays')}{' '}
                 {returns.length}
               </div>
             </>
@@ -471,7 +471,7 @@ export default function Analytics() {
 
         <div className="card">
           <div className="card-header">
-            <span className="card-title">{t('analytics.correlationMatrix', '相关性矩阵')}</span>
+            <span className="card-title">{t('analytics.correlationMatrix')}</span>
             <span className="tag tag-blue">{CORRELATION_TICKERS.join(' · ')}</span>
           </div>
           <SectionBody
@@ -485,7 +485,7 @@ export default function Analytics() {
 
         <div className="card">
           <div className="card-header">
-            <span className="card-title">{t('analytics.drawdownAnalysis', '回撤分析')}</span>
+            <span className="card-title">{t('analytics.drawdownAnalysis')}</span>
             <span className="tag tag-gray">{selected}</span>
           </div>
           <SectionBody
@@ -511,7 +511,7 @@ export default function Analytics() {
                       stroke="#f85149"
                       fill="rgba(248, 81, 73, 0.35)"
                       strokeWidth={2}
-                      name={t('analytics.drawdownPct', '回撤')}
+                      name={t('analytics.drawdownPct')}
                     />
                   </AreaChart>
                 </ResponsiveContainer>
@@ -519,12 +519,12 @@ export default function Analytics() {
               {worstDrawdown && (
                 <div style={{ ...metricGridStyle, marginTop: 12 }}>
                   <Metric
-                    label={t('analytics.maxDrawdown', '最大回撤')}
+                    label={t('analytics.maxDrawdown')}
                     value={toPercent(worstDrawdown.dd)}
                     tone="negative"
                   />
                   <Metric
-                    label={t('analytics.maxDrawdownDate', '发生日期')}
+                    label={t('analytics.maxDrawdownDate')}
                     value={worstDrawdown.date || '—'}
                   />
                 </div>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { t } from '../i18n'
 import { usePriceStream, usePriceStreamStatus, type PriceQuote } from '../hooks/usePriceStream'
@@ -47,7 +48,7 @@ function LiveStatus() {
   return (
     <span className={`live-status ${live ? 'live-on' : 'live-off'}`} style={{ marginLeft: 10 }}>
       <span className="live-dot" />
-      {live ? t('common.live', '实时行情') : t('common.liveConnecting', '连接中…')}
+      {live ? t('common.live') : t('common.liveConnecting')}
     </span>
   )
 }
@@ -81,38 +82,38 @@ function TopMovers({ assets }: { assets: Asset[] }) {
     <div className="grid-3" style={{ marginTop: 20 }}>
       <div className="card">
         <div className="card-header">
-          <span className="card-title">{t('equities.topGainers', '涨幅榜')}</span>
+          <span className="card-title">{t('equities.topGainers')}</span>
         </div>
         <div style={{ padding: 20, textAlign: 'center' }}>
           <div style={{ fontSize: '2rem', color: 'var(--accent-green)' }}>
             {topGainer ? formatChange(topGainer.change) : '--'}
           </div>
           <div style={{ color: 'var(--text-secondary)', marginTop: 8 }}>
-            {topGainer ? `${topGainer.asset.name} (${topGainer.asset.ticker})` : t('equities.noData', '暂无数据')}
+            {topGainer ? `${topGainer.asset.name} (${topGainer.asset.ticker})` : t('equities.noData')}
           </div>
         </div>
       </div>
       <div className="card">
         <div className="card-header">
-          <span className="card-title">{t('equities.topLosers', '跌幅榜')}</span>
+          <span className="card-title">{t('equities.topLosers')}</span>
         </div>
         <div style={{ padding: 20, textAlign: 'center' }}>
           <div style={{ fontSize: '2rem', color: 'var(--accent-red)' }}>
             {topLoser ? formatChange(topLoser.change) : '--'}
           </div>
           <div style={{ color: 'var(--text-secondary)', marginTop: 8 }}>
-            {topLoser ? `${topLoser.asset.name} (${topLoser.asset.ticker})` : t('equities.noData', '暂无数据')}
+            {topLoser ? `${topLoser.asset.name} (${topLoser.asset.ticker})` : t('equities.noData')}
           </div>
         </div>
       </div>
       <div className="card">
         <div className="card-header">
-          <span className="card-title">{t('equities.mostActive', '活跃榜')}</span>
+          <span className="card-title">{t('equities.mostActive')}</span>
         </div>
         <div style={{ padding: 20, textAlign: 'center' }}>
           <div style={{ fontSize: '2rem' }}>{mostActive ? formatVolume(mostActive.volume) : '--'}</div>
           <div style={{ color: 'var(--text-secondary)', marginTop: 8 }}>
-            {mostActive ? `${mostActive.asset.name} (${mostActive.asset.ticker})` : t('equities.noData', '暂无数据')}
+            {mostActive ? `${mostActive.asset.name} (${mostActive.asset.ticker})` : t('equities.noData')}
           </div>
         </div>
       </div>
@@ -123,6 +124,7 @@ function TopMovers({ assets }: { assets: Asset[] }) {
 // ---------------------------------------------------------------- 页面
 export default function Equities() {
   const { worldId } = useCurrentWorld()
+  const navigate = useNavigate()
   const [assets, setAssets] = useState<Asset[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -135,7 +137,7 @@ export default function Equities() {
         const res = await axios.get(`/api/v1/assets?world_id=${worldId}&type=EQUITY&limit=500&with_change=1`)
         setAssets(res.data)
       } catch (err) {
-        setError(t('common.dataError', '数据加载失败'))
+        setError(t('common.dataError'))
       } finally {
         setLoading(false)
       }
@@ -150,11 +152,11 @@ export default function Equities() {
     return (
       <div>
         <div className="page-header">
-          <h2>{t('equities.title', '股票')}</h2>
-          <p className="subtitle">{t('equities.subtitle', '全球股票行情')}</p>
+          <h2>{t('equities.title')}</h2>
+          <p className="subtitle">{t('equities.subtitle')}</p>
         </div>
         <div className="card">
-          <div className="loading" style={{ padding: 40 }}>{t('common.loading', '加载中...')}</div>
+          <div className="loading" style={{ padding: 40 }}>{t('common.loading')}</div>
         </div>
       </div>
     )
@@ -164,8 +166,8 @@ export default function Equities() {
     return (
       <div>
         <div className="page-header">
-          <h2>{t('equities.title', '股票')}</h2>
-          <p className="subtitle">{t('equities.subtitle', '全球股票行情')}</p>
+          <h2>{t('equities.title')}</h2>
+          <p className="subtitle">{t('equities.subtitle')}</p>
         </div>
         <div className="card">
           <div className="error" style={{ padding: 40 }}>{error}</div>
@@ -177,14 +179,14 @@ export default function Equities() {
   return (
     <div>
       <div className="page-header">
-        <h2>{t('equities.title', '股票')}</h2>
-        <p className="subtitle">{t('equities.subtitle', '全球股票行情')} · {assets.length} stocks</p>
+        <h2>{t('equities.title')}</h2>
+        <p className="subtitle">{t('equities.subtitle')} · {assets.length} stocks</p>
         <LiveStatus />
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="card-header">
-          <span className="card-title">{t('equities.filter', '筛选')}</span>
+          <span className="card-title">{t('equities.filter')}</span>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button
@@ -199,7 +201,7 @@ export default function Equities() {
               fontSize: 13,
             }}
           >
-            {t('equities.all', '全部')}
+            {t('equities.all')}
           </button>
           {sectors.map((sector) => (
             <button
@@ -223,24 +225,29 @@ export default function Equities() {
 
       <div className="card">
         <div className="card-header">
-          <span className="card-title">{t('equities.marketSummary', '市场摘要')}</span>
+          <span className="card-title">{t('equities.marketSummary')}</span>
           <span className="tag tag-blue">SIMULATION</span>
         </div>
         <table className="data-table">
           <thead>
             <tr>
-              <th>{t('equities.ticker', '代码')}</th>
-              <th>{t('equities.name', '名称')}</th>
-              <th>{t('equities.price', '现价')}</th>
-              <th>{t('equities.change', '涨跌幅')}</th>
-              <th>{t('equities.volume', '成交量')}</th>
-              <th>{t('equities.marketCap', '市值')}</th>
+              <th>{t('equities.ticker')}</th>
+              <th>{t('equities.name')}</th>
+              <th>{t('equities.price')}</th>
+              <th>{t('equities.change')}</th>
+              <th>{t('equities.volume')}</th>
+              <th>{t('equities.marketCap')}</th>
             </tr>
           </thead>
           <tbody>
             {filtered.map((asset) => (
               // key 稳定用 id，排序不随实时价格变化，滚动位置不会跳动
-              <tr key={asset.id}>
+              <tr
+                key={asset.id}
+                style={{ cursor: 'pointer' }}
+                onClick={() => navigate(`/asset/${encodeURIComponent(asset.ticker)}`)}
+                title={t('assetDetail.viewDetail')}
+              >
                 <td>{asset.ticker}</td>
                 <td>{asset.name}</td>
                 <td>

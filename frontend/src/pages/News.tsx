@@ -65,7 +65,7 @@ export default function News() {
       <div>
         <div className="page-header">
           <h2>{t('news.title')}</h2>
-          <p className="subtitle">{t('news.subtitle', '市场新闻和事件')}</p>
+          <p className="subtitle">{t('news.subtitle')}</p>
         </div>
         <div className="card"><div className="loading" style={{padding: 40}}>{t('common.loading')}</div></div>
       </div>
@@ -77,7 +77,7 @@ export default function News() {
       <div>
         <div className="page-header">
           <h2>{t('news.title')}</h2>
-          <p className="subtitle">{t('news.subtitle', '市场新闻和事件')}</p>
+          <p className="subtitle">{t('news.subtitle')}</p>
         </div>
         <div className="card"><div className="error" style={{padding: 40}}>{error}</div></div>
       </div>
@@ -88,12 +88,12 @@ export default function News() {
     <div>
       <div className="page-header">
         <h2>{t('news.title')}</h2>
-        <p className="subtitle">{t('news.subtitle', '市场新闻和事件')}</p>
+        <p className="subtitle">{t('news.subtitle')}</p>
       </div>
 
       <div className="card">
         <div className="card-header">
-          <span className="card-title">{t('news.allNews', '全部新闻')}</span>
+          <span className="card-title">{t('news.allNews')}</span>
           <select
             className="input-field"
             style={{ width: 'auto' }}
@@ -113,11 +113,11 @@ export default function News() {
         <table className="data-table">
           <thead>
             <tr>
-              <th>{t('overview.time', '时间')}</th>
-              <th>{t('overview.headline', '标题')}</th>
-              <th>{t('overview.importance', '重要性')}</th>
-              <th>{t('news.sentiment', '情绪')}</th>
-              <th>{t('overview.assets', '影响资产')}</th>
+              <th>{t('overview.time')}</th>
+              <th>{t('overview.headline')}</th>
+              <th>{t('overview.importance')}</th>
+              <th>{t('news.sentiment')}</th>
+              <th>{t('overview.assets')}</th>
             </tr>
           </thead>
           <tbody>

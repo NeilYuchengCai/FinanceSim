@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { t } from '../i18n'
 import { usePriceStream } from '../hooks/usePriceStream'
 import { useCurrentWorld } from '../hooks/useCurrentWorld'
+import { bondsApi } from '../services/api'
+import YieldCurveChart from '../components/charts/YieldCurveChart'
 
 interface Bond {
   bond_id: string
@@ -24,10 +27,14 @@ interface Bond {
 
 export default function Bonds() {
   const { worldId } = useCurrentWorld()
+  const navigate = useNavigate()
   const [bonds, setBonds] = useState<Bond[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState('ALL')
+  const [yieldCurve, setYieldCurve] = useState<{ tenor: number; yield: number }[]>([])
+  const [yieldLoading, setYieldLoading] = useState(true)
+  const [yieldError, setYieldError] = useState<string | null>(null)
   const { prices, connected } = usePriceStream()
 
   useEffect(() => {
@@ -44,6 +51,22 @@ export default function Bonds() {
     fetchBonds()
   }, [worldId])
 
+  // 收益率曲线：GET /bonds/yield-curve -> [{tenor, yield}]
+  useEffect(() => {
+    const fetchYieldCurve = async () => {
+      try {
+        const data = await bondsApi.getYieldCurve()
+        setYieldCurve(Array.isArray(data) ? data : [])
+        setYieldError(null)
+      } catch {
+        setYieldError(t('common.dataError'))
+      } finally {
+        setYieldLoading(false)
+      }
+    }
+    fetchYieldCurve()
+  }, [])
+
   const filtered = filter === 'ALL' ? bonds : bonds.filter(b => b.type === filter)
   const types = [...new Set(bonds.map(b => b.type))]
 
@@ -55,7 +78,7 @@ export default function Bonds() {
       <div>
         <div className="page-header">
           <h2>{t('bonds.title')}</h2>
-          <p className="subtitle">{t('bonds.subtitle', '国债和企业债')}</p>
+          <p className="subtitle">{t('bonds.subtitle')}</p>
         </div>
         <div className="card"><div className="loading" style={{ padding: 40 }}>{t('common.loading')}</div></div>
       </div>
@@ -67,7 +90,7 @@ export default function Bonds() {
       <div>
         <div className="page-header">
           <h2>{t('bonds.title')}</h2>
-          <p className="subtitle">{t('bonds.subtitle', '国债和企业债')}</p>
+          <p className="subtitle">{t('bonds.subtitle')}</p>
         </div>
         <div className="card"><div className="error" style={{ padding: 40 }}>{error}</div></div>
       </div>
@@ -79,16 +102,16 @@ export default function Bonds() {
       <div className="page-header">
         <h2>{t('bonds.title')}</h2>
         <p className="subtitle">
-          {t('bonds.subtitle', '国债和企业债')} · {bonds.length} bonds
+          {t('bonds.subtitle')} · {bonds.length} bonds
           <span style={{ marginLeft: 16, fontSize: 12, color: connected ? 'var(--accent-green)' : 'var(--accent-red)' }}>
-            ● {connected ? t('common.live', '实时') : t('common.connecting', '连接中...')}
+            ● {connected ? t('common.live') : t('common.connecting')}
           </span>
         </p>
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="card-header">
-          <span className="card-title">{t('bonds.filter', '筛选')}</span>
+          <span className="card-title">{t('bonds.filter')}</span>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button
@@ -103,7 +126,7 @@ export default function Bonds() {
               fontSize: 13,
             }}
           >
-            {t('bonds.all', '全部')}
+            {t('bonds.all')}
           </button>
           {types.map(type => (
             <button
@@ -127,25 +150,30 @@ export default function Bonds() {
 
       <div className="card">
         <div className="card-header">
-          <span className="card-title">{t('bonds.bondList', '债券列表')}</span>
+          <span className="card-title">{t('bonds.bondList')}</span>
         </div>
         <table className="data-table">
           <thead>
             <tr>
               <th>{t('equities.ticker')}</th>
               <th>{t('equities.name')}</th>
-              <th>{t('bonds.type', '类型')}</th>
+              <th>{t('bonds.type')}</th>
               <th>{t('bonds.rating')}</th>
               <th>{t('bonds.coupon')}</th>
               <th>{t('equities.price')}</th>
-              <th>{t('bonds.ytm', '到期收益率')}</th>
+              <th>{t('bonds.ytm')}</th>
               <th>{t('bonds.duration')}</th>
-              <th>{t('bonds.maturity', '到期日')}</th>
+              <th>{t('bonds.maturity')}</th>
             </tr>
           </thead>
           <tbody>
             {filtered.map(bond => (
-              <tr key={bond.bond_id}>
+              <tr
+                key={bond.bond_id}
+                style={{ cursor: 'pointer' }}
+                onClick={() => navigate(`/asset/${encodeURIComponent(bond.ticker)}`)}
+                title={t('assetDetail.viewDetail')}
+              >
                 <td>{bond.ticker}</td>
                 <td>{bond.name}</td>
                 <td>{bond.type}</td>
@@ -180,12 +208,13 @@ export default function Bonds() {
         <div className="card-header">
           <span className="card-title">{t('bonds.yieldCurve')}</span>
         </div>
-        <div className="chart-container" style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>
-            <div style={{ fontSize: '2rem', marginBottom: 8 }}>📈</div>
-            <div>Yield Curve: {formatYield(bonds[0]?.yield_to_maturity || 0)} - {formatYield(bonds[bonds.length - 1]?.yield_to_maturity || 0)}</div>
-          </div>
-        </div>
+        {yieldLoading ? (
+          <div className="loading" style={{ padding: 40 }}>{t('common.loading')}</div>
+        ) : yieldError ? (
+          <div className="error" style={{ padding: 40 }}>{yieldError}</div>
+        ) : (
+          <YieldCurveChart data={yieldCurve} height={260} />
+        )}
       </div>
     </div>
   )

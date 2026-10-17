@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { t } from '../i18n'
 import { usePriceStream } from '../hooks/usePriceStream'
@@ -21,6 +22,7 @@ function normalizeTicker(ticker: string): string {
 }
 
 export default function FX() {
+  const navigate = useNavigate()
   const [pairs, setPairs] = useState<FXPair[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -32,7 +34,7 @@ export default function FX() {
         const res = await axios.get('/api/v1/fx/pairs')
         setPairs(res.data)
       } catch (err) {
-        setError(t('common.dataError', '数据加载失败'))
+        setError(t('common.dataError'))
       } finally {
         setLoading(false)
       }
@@ -52,7 +54,7 @@ export default function FX() {
       <div>
         <div className="page-header">
           <h2>{t('fx.title')}</h2>
-          <p className="subtitle">{t('fx.subtitle', '货币对实时汇率')}</p>
+          <p className="subtitle">{t('fx.subtitle')}</p>
         </div>
         <div className="card"><div className="loading" style={{ padding: 40 }}>{t('common.loading')}</div></div>
       </div>
@@ -64,7 +66,7 @@ export default function FX() {
       <div>
         <div className="page-header">
           <h2>{t('fx.title')}</h2>
-          <p className="subtitle">{t('fx.subtitle', '货币对实时汇率')}</p>
+          <p className="subtitle">{t('fx.subtitle')}</p>
         </div>
         <div className="card"><div className="error" style={{ padding: 40 }}>{error}</div></div>
       </div>
@@ -76,9 +78,9 @@ export default function FX() {
       <div className="page-header">
         <h2>{t('fx.title')}</h2>
         <p className="subtitle">
-          {t('fx.subtitle', '货币对实时汇率')} · {pairs.length} pairs
+          {t('fx.subtitle')} · {pairs.length} pairs
           <span style={{ marginLeft: 16, fontSize: 12, color: connected ? 'var(--accent-green)' : 'var(--accent-red)' }}>
-            ● {connected ? t('common.live', '实时') : t('common.connecting', '连接中...')}
+            ● {connected ? t('common.live') : t('common.connecting')}
           </span>
         </p>
       </div>
@@ -91,7 +93,13 @@ export default function FX() {
           const displayChange = quote ? quote.changePct : pair.change_24h
 
           return (
-            <div key={pair.ticker} className="card" style={{ borderLeft: `3px solid ${displayChange >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'}` }}>
+            <div
+              key={pair.ticker}
+              className="card"
+              style={{ borderLeft: `3px solid ${displayChange >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'}`, cursor: 'pointer' }}
+              onClick={() => navigate(`/asset/${encodeURIComponent(pair.ticker)}`)}
+              title={t('assetDetail.viewDetail')}
+            >
               <div className="card-header">
                 <span className="card-title">{pair.ticker}</span>
                 <span className={`badge badge-dot ${displayChange >= 0 ? 'green' : 'red'}`}></span>
@@ -112,20 +120,20 @@ export default function FX() {
 
       <div className="card" style={{ marginTop: 20 }}>
         <div className="card-header">
-          <span className="card-title">{t('fx.allPairs', '全部货币对')}</span>
+          <span className="card-title">{t('fx.allPairs')}</span>
           <span className="tag tag-blue">{pairs.length} pairs</span>
         </div>
         <table className="data-table">
           <thead>
             <tr>
               <th>{t('equities.ticker')}</th>
-              <th>{t('fx.base', '基准')}</th>
-              <th>{t('fx.quote', '报价')}</th>
+              <th>{t('fx.base')}</th>
+              <th>{t('fx.quote')}</th>
               <th>{t('equities.price')}</th>
-              <th>{t('fx.change24h', '24h涨跌')}</th>
-              <th>{t('fx.spread', '点差')}</th>
-              <th>{t('fx.high24h', '24h最高')}</th>
-              <th>{t('fx.low24h', '24h最低')}</th>
+              <th>{t('fx.change24h')}</th>
+              <th>{t('fx.spread')}</th>
+              <th>{t('fx.high24h')}</th>
+              <th>{t('fx.low24h')}</th>
             </tr>
           </thead>
           <tbody>
@@ -136,7 +144,12 @@ export default function FX() {
               const displayChange = quote ? quote.changePct : pair.change_24h
 
               return (
-                <tr key={pair.ticker}>
+                <tr
+                  key={pair.ticker}
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => navigate(`/asset/${encodeURIComponent(pair.ticker)}`)}
+                  title={t('assetDetail.viewDetail')}
+                >
                   <td>{pair.ticker}</td>
                   <td>{pair.base}</td>
                   <td>{pair.quote}</td>

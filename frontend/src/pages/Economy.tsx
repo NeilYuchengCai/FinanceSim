@@ -121,7 +121,7 @@ export default function Economy() {
         setHistory(mapHistory(res.data))
         setHistoryError(null)
       } catch {
-        setHistoryError(t('common.dataError', '数据加载失败'))
+        setHistoryError(t('common.dataError'))
       } finally {
         setHistoryLoading(false)
       }
@@ -136,7 +136,7 @@ export default function Economy() {
         setIndicators(res.data && typeof res.data === 'object' ? res.data : null)
         setIndicatorsError(null)
       } catch {
-        setIndicatorsError(t('economy.indicatorsFailed', '综合指标加载失败'))
+        setIndicatorsError(t('economy.indicatorsFailed'))
       } finally {
         setIndicatorsLoading(false)
       }
@@ -148,7 +148,7 @@ export default function Economy() {
     <div className="page-header">
       <h2>{t('economy.title')}</h2>
       <p className="subtitle">
-        {t('economy.subtitle', '经济指标和趋势')} - {t('overview.day', '第')} {state?.cycle_position || 0} {t('overview.day', '天')}
+        {t('economy.subtitle')} - {t('overview.day')} {state?.cycle_position || 0} {t('overview.day')}
       </p>
     </div>
   )
@@ -187,9 +187,9 @@ export default function Economy() {
     <div className="loading" style={{ padding: 40 }}>
       <div style={{ textAlign: 'center' }}>
         <div style={{ fontSize: 32, marginBottom: 8 }}>📉</div>
-        <div>{t('economy.noHistory', '模拟推进后将生成历史数据')}</div>
+        <div>{t('economy.noHistory')}</div>
         <div style={{ fontSize: 12, marginTop: 6, color: 'var(--text-secondary)' }}>
-          {t('economy.noHistoryHint', '当前还没有宏观经济历史记录，推进模拟后即可查看趋势')}
+          {t('economy.noHistoryHint')}
         </div>
       </div>
     </div>
@@ -203,40 +203,40 @@ export default function Economy() {
     const money = indicators.monetary_policy ?? {}
     const cycle = indicators.business_cycle ?? {}
     if (typeof g.gdp_growth_annual === 'number') {
-      indicatorRows.push({ label: t('economy.indGdpGrowthAnnual', 'GDP 年增长率'), value: formatPctNumber(g.gdp_growth_annual) })
+      indicatorRows.push({ label: t('economy.indGdpGrowthAnnual'), value: formatPctNumber(g.gdp_growth_annual) })
     }
     if (typeof g.industrial_production_index === 'number') {
-      indicatorRows.push({ label: t('economy.indIndustrialProduction', '工业生产指数'), value: formatIndex(g.industrial_production_index) })
+      indicatorRows.push({ label: t('economy.indIndustrialProduction'), value: formatIndex(g.industrial_production_index) })
     }
     if (typeof g.consumer_confidence === 'number') {
-      indicatorRows.push({ label: t('economy.indConsumerConfidence', '消费者信心'), value: formatIndex(g.consumer_confidence) })
+      indicatorRows.push({ label: t('economy.indConsumerConfidence'), value: formatIndex(g.consumer_confidence) })
     }
     if (typeof inf.cpi_inflation === 'number') {
-      indicatorRows.push({ label: t('economy.indCpiInflation', 'CPI 通胀'), value: formatPctNumber(inf.cpi_inflation) })
+      indicatorRows.push({ label: t('economy.indCpiInflation'), value: formatPctNumber(inf.cpi_inflation) })
     }
     if (typeof inf.expected_inflation === 'number') {
-      indicatorRows.push({ label: t('economy.indExpectedInflation', '预期通胀'), value: formatPctNumber(inf.expected_inflation) })
+      indicatorRows.push({ label: t('economy.indExpectedInflation'), value: formatPctNumber(inf.expected_inflation) })
     }
     if (typeof labor.unemployment_rate === 'number') {
-      indicatorRows.push({ label: t('economy.indUnemploymentRate', '失业率'), value: formatPctNumber(labor.unemployment_rate) })
+      indicatorRows.push({ label: t('economy.indUnemploymentRate'), value: formatPctNumber(labor.unemployment_rate) })
     }
     if (typeof labor.natural_rate === 'number') {
-      indicatorRows.push({ label: t('economy.indNaturalRate', '自然失业率'), value: formatPctNumber(labor.natural_rate) })
+      indicatorRows.push({ label: t('economy.indNaturalRate'), value: formatPctNumber(labor.natural_rate) })
     }
     if (typeof money.policy_rate === 'number') {
-      indicatorRows.push({ label: t('economy.indPolicyRate', '政策利率'), value: formatPctNumber(money.policy_rate) })
+      indicatorRows.push({ label: t('economy.indPolicyRate'), value: formatPctNumber(money.policy_rate) })
     }
     if (typeof money.money_supply_growth === 'number') {
-      indicatorRows.push({ label: t('economy.indMoneySupplyGrowth', '货币供应增长'), value: formatPctNumber(money.money_supply_growth) })
+      indicatorRows.push({ label: t('economy.indMoneySupplyGrowth'), value: formatPctNumber(money.money_supply_growth) })
     }
     if (typeof cycle.phase === 'string') {
-      indicatorRows.push({ label: t('economy.indCyclePhase', '周期阶段'), value: cycle.phase })
+      indicatorRows.push({ label: t('economy.indCyclePhase'), value: cycle.phase })
     }
     if (typeof cycle.position === 'number') {
-      indicatorRows.push({ label: t('economy.indCyclePosition', '周期位置'), value: String(cycle.position) })
+      indicatorRows.push({ label: t('economy.indCyclePosition'), value: String(cycle.position) })
     }
     if (typeof cycle.days_in_cycle === 'number') {
-      indicatorRows.push({ label: t('economy.indDaysInCycle', '周期内天数'), value: String(cycle.days_in_cycle) })
+      indicatorRows.push({ label: t('economy.indDaysInCycle'), value: String(cycle.days_in_cycle) })
     }
   }
 
@@ -253,18 +253,18 @@ export default function Economy() {
             </span>
           </div>
           <div className="stat-value">{formatPercent(state.gdp_growth)}</div>
-          <div className="stat-change">{t('economy.annualRate', '年度增长率')}</div>
+          <div className="stat-change">{t('economy.annualRate')}</div>
         </div>
 
         <div className="card">
           <div className="card-header">
-            <span className="card-title">{t('economy.cpi', 'CPI')}</span>
+            <span className="card-title">{t('economy.cpi')}</span>
             <span className={`tag ${state.inflation <= 0.02 ? 'tag-green' : 'tag-red'}`}>
               {formatPercent(state.inflation)}
             </span>
           </div>
           <div className="stat-value">{formatPercent(state.inflation)}</div>
-          <div className="stat-change">{t('economy.target2pct', '目标: 2.0%')}</div>
+          <div className="stat-change">{t('economy.target2pct')}</div>
         </div>
 
         <div className="card">
@@ -273,7 +273,7 @@ export default function Economy() {
             <span className="tag tag-blue">{formatPercent(state.unemployment)}</span>
           </div>
           <div className="stat-value">{formatPercent(state.unemployment)}</div>
-          <div className="stat-change">{t('economy.naturalRate5pct', '自然率: 5.0%')}</div>
+          <div className="stat-change">{t('economy.naturalRate5pct')}</div>
         </div>
 
         <div className="card">
@@ -282,29 +282,29 @@ export default function Economy() {
             <span className="tag tag-blue">{formatPercent(state.interest_rate)}</span>
           </div>
           <div className="stat-value">{formatPercent(state.interest_rate)}</div>
-          <div className="stat-change">{t('economy.policyRate', '政策利率')}</div>
+          <div className="stat-change">{t('economy.policyRate')}</div>
         </div>
 
         <div className="card">
           <div className="card-header">
-            <span className="card-title">{t('economy.consumerConfidence', '消费者信心')}</span>
+            <span className="card-title">{t('economy.consumerConfidence')}</span>
           </div>
           <div className="stat-value">{formatIndex(state.consumer_confidence)}</div>
-          <div className="stat-change">{t('economy.indexBase100', '基准指数: 100')}</div>
+          <div className="stat-change">{t('economy.indexBase100')}</div>
         </div>
 
         <div className="card">
           <div className="card-header">
-            <span className="card-title">{t('economy.industrialProduction', '工业生产')}</span>
+            <span className="card-title">{t('economy.industrialProduction')}</span>
           </div>
           <div className="stat-value">{formatIndex(state.industrial_production)}</div>
-          <div className="stat-change">{t('economy.indexBase100', '基准指数: 100')}</div>
+          <div className="stat-change">{t('economy.indexBase100')}</div>
         </div>
       </div>
 
       <div className="card" style={{marginTop: 16}}>
         <div className="card-header">
-          <span className="card-title">{t('economy.gdpTrend', 'GDP增长趋势')}</span>
+          <span className="card-title">{t('economy.gdpTrend')}</span>
         </div>
         {historyLoading ? (
           <div className="loading" style={{ padding: 40 }}>{t('common.loading')}</div>
@@ -313,7 +313,7 @@ export default function Economy() {
         ) : gdpSeries.length > 0 ? (
           <MacroeconomicChart
             data={gdpSeries}
-            title={t('economy.gdpGrowthPercent', 'GDP Growth (%)')}
+            title={t('economy.gdpGrowthPercent')}
             color="#ef4444"
             height={220}
           />
@@ -324,7 +324,7 @@ export default function Economy() {
 
       <div className="card" style={{marginTop: 16}}>
         <div className="card-header">
-          <span className="card-title">{t('economy.inflationTrend', '通胀趋势')}</span>
+          <span className="card-title">{t('economy.inflationTrend')}</span>
         </div>
         {historyLoading ? (
           <div className="loading" style={{ padding: 40 }}>{t('common.loading')}</div>
@@ -333,7 +333,7 @@ export default function Economy() {
         ) : inflationSeries.length > 0 ? (
           <MacroeconomicChart
             data={inflationSeries}
-            title={t('economy.inflationPercent', 'Inflation (%)')}
+            title={t('economy.inflationPercent')}
             color="#f59e0b"
             height={220}
           />
@@ -344,7 +344,7 @@ export default function Economy() {
 
       <div className="card" style={{marginTop: 16}}>
         <div className="card-header">
-          <span className="card-title">{t('economy.indicators', '综合经济指标')}</span>
+          <span className="card-title">{t('economy.indicators')}</span>
         </div>
         {indicatorsLoading ? (
           <div className="loading" style={{ padding: 40 }}>{t('common.loading')}</div>
@@ -352,14 +352,14 @@ export default function Economy() {
           <div className="error" style={{ padding: 40 }}>{indicatorsError}</div>
         ) : indicatorRows.length === 0 ? (
           <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-secondary)' }}>
-            {t('common.noData', '暂无数据')}
+            {t('common.noData')}
           </div>
         ) : (
           <table className="data-table">
             <thead>
               <tr>
-                <th>{t('simulation.metric', '指标')}</th>
-                <th>{t('markets.price', '数值')}</th>
+                <th>{t('simulation.metric')}</th>
+                <th>{t('markets.price')}</th>
               </tr>
             </thead>
             <tbody>
