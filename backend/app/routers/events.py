@@ -3,7 +3,8 @@ FinanceSim Event Router
 事件、传播和时间线 API
 """
 import logging
-from typing import List, Optional
+import math
+from typing import Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
@@ -13,7 +14,12 @@ from app.dependencies import get_world_or_404
 from app.models import Event, News, Asset, World
 from app.schemas import EventCreate, NewsResponse
 from app.engines.event_engine import EventGenerator, EventPropagation, Event as SimEvent
-from app.services.market_stream import get_market_stream
+from app.services.market_stream import (
+    get_market_stream,
+    TICKS_PER_TRADING_DAY,
+    TICK_VOL_SCALE,
+    TRADING_DAYS_PER_YEAR as _MS_TRADING_DAYS,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +28,81 @@ router = APIRouter(prefix="/events", tags=["events"])
 # 全局引擎实例
 _event_generator = None
 _event_propagation = None
+
+# ---------------------------------------------------------------- 价格冲击参数
+# 单次事件冲击占价格比例的上限：封顶 ±5%，防止黑天鹅一戳到底
+MAX_EVENT_SHOCK_PCT = 0.05
+# propagate 输出的 impact（severity*sentiment 量级 ±1）到价格冲击的基础换算系数
+IMPACT_TO_PRICE = 0.12
+# 波动率差异化：以年化 25% 的普通股票为基准 1.0，缩放范围 [0.5, 2.0]
+_REFERENCE_SIGMA = (
+    0.25 / math.sqrt(_MS_TRADING_DAYS) / math.sqrt(TICKS_PER_TRADING_DAY) * TICK_VOL_SCALE
+)
+VOL_SCALE_RANGE = (0.5, 2.0)
+# 事件类型差异化：危机类冲击最大，宏观类居中，公司类最温和
+EVENT_TYPE_SHOCK_SCALE = {
+    "liquidity_crisis": 1.5,
+    "banking_crisis": 1.5,
+    "black_swan": 1.5,
+    "geopolitical": 1.0,
+    "central_bank": 1.0,
+    "inflation_shock": 1.0,
+    "employment_shock": 1.0,
+}
+DEFAULT_TYPE_SHOCK_SCALE = 0.7  # COMPANY 类事件
+
+
+def apply_event_price_shocks(event: SimEvent, assets: List[Dict]) -> List[Dict]:
+    """把事件传播影响封顶后按资产波动率/事件类型差异化施加到行情。
+
+    返回实际施加的明细 [{ticker, level, sector, raw_impact, applied_pct}]，
+    供日志核对；传播引擎或行情流不可用时返回空列表。
+    """
+    if _event_propagation is None:
+        return []
+    stream = get_market_stream()
+    if stream is None:
+        return []
+
+    impacts = _event_propagation.propagate(event, assets)
+    type_scale = EVENT_TYPE_SHOCK_SCALE.get(event.type, DEFAULT_TYPE_SHOCK_SCALE)
+
+    applied: List[Dict] = []
+    for imp in impacts:
+        ticker = imp.get("ticker")
+        if not ticker or ticker == "MACRO":
+            continue  # 宏观影响不直接映射到单个行情标的
+        raw = float(imp.get("impact") or 0.0)
+        if raw == 0.0:
+            continue
+        state = stream._assets.get(ticker)
+        if state is None:
+            continue
+
+        # 1) 基础换算并封顶 ±5%
+        base = max(-MAX_EVENT_SHOCK_PCT, min(MAX_EVENT_SHOCK_PCT, raw * IMPACT_TO_PRICE))
+        # 2) 按资产波动率差异化：高波动资产对同一事件反应更大
+        vol_ratio = state.sigma / _REFERENCE_SIGMA if _REFERENCE_SIGMA > 0 else 1.0
+        vol_scale = max(VOL_SCALE_RANGE[0], min(VOL_SCALE_RANGE[1], vol_ratio))
+        # 3) 按事件类型差异化，并再次封顶，保证任何组合都不超过 ±5%
+        pct = max(-MAX_EVENT_SHOCK_PCT,
+                  min(MAX_EVENT_SHOCK_PCT, base * vol_scale * type_scale))
+        if pct == 0.0:
+            continue
+        stream.apply_shock(ticker, pct)
+        applied.append({
+            "ticker": ticker,
+            "level": imp.get("level"),
+            "sector": imp.get("sector"),
+            "raw_impact": round(raw, 6),
+            "applied_pct": round(pct, 6),
+        })
+
+    logger.info(
+        "Event '%s' (type=%s severity=%.2f) price shocks applied to %d assets",
+        event.title, event.type, event.severity, len(applied),
+    )
+    return applied
 
 
 def init_event_engine(gen: EventGenerator, prop: EventPropagation):
@@ -82,7 +163,9 @@ async def list_events(
             "affected_sectors": e.affected_sectors,
             "sentiment_effect": e.sentiment_effect,
             "created_at": e.created_at.isoformat(),
-            "duration_days": e.duration_days or 0
+            "duration_days": e.duration_days or 0,
+            # 数据来源标注：事件为模拟事件引擎生成
+            "data_source": "SIMULATED",
         }
         for e in events
     ]
@@ -115,7 +198,8 @@ async def get_asset_timeline(
             "severity": e.severity,
             "title": e.title,
             "affected_assets": e.affected_assets,
-            "created_at": e.created_at.isoformat()
+            "created_at": e.created_at.isoformat(),
+            "data_source": "SIMULATED",
         }
         for e in events
     ]
@@ -149,14 +233,9 @@ async def generate_event(
     event = _event_generator.generate_event(assets=assets, sectors=sectors)
     await persist_event(world_id, event, session)
 
-    # 与每日生成路径一致：把事件影响真实传导到行情
+    # 与每日生成路径一致：把事件影响封顶(±5%)后按波动率/类型差异化传导到行情
     try:
-        stream = get_market_stream()
-        if _event_propagation is not None and stream is not None:
-            for imp in _event_propagation.propagate(event, assets):
-                tk = imp.get("ticker")
-                if tk and tk != "MACRO":
-                    stream.apply_shock(tk, float(imp.get("impact", 0.0)) * 0.12)
+        apply_event_price_shocks(event, assets)
     except Exception as e:
         logger.warning(f"Event propagation after generate failed: {e}")
 
@@ -170,7 +249,8 @@ async def generate_event(
         "affected_sectors": event.affected_sectors,
         "sentiment_effect": event.sentiment_effect,
         "created_at": event.created_at.isoformat(),
-        "duration_days": event.duration_days or 0
+        "duration_days": event.duration_days or 0,
+        "data_source": "SIMULATED",
     }
 
 

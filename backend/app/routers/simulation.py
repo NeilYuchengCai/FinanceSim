@@ -247,7 +247,11 @@ async def _run_daily_generators(world_id: int, session: AsyncSession, day: int, 
 
     # 3) 生成与市场挂钩的事件，持久化并施加价格冲击
     try:
-        from app.routers.events import _event_generator, _event_propagation, persist_event
+        from app.routers.events import (
+            _event_generator,
+            apply_event_price_shocks,
+            persist_event,
+        )
         stream = get_market_stream()
         assets = []
         if stream is not None:
@@ -255,11 +259,8 @@ async def _run_daily_generators(world_id: int, session: AsyncSession, day: int, 
         if _event_generator is not None and assets and random.random() < 0.7:
             ev = _event_generator.generate_event(assets, list({a["sector"] for a in assets}))
             await persist_event(world_id, ev, session)
-            if _event_propagation is not None and stream is not None:
-                for imp in _event_propagation.propagate(ev, assets):
-                    tk = imp.get("ticker")
-                    if tk and tk != "MACRO":
-                        stream.apply_shock(tk, float(imp.get("impact", 0.0)) * 0.12)
+            # 冲击封顶 ±5% 并按资产波动率/事件类型差异化（明细由函数内记录日志）
+            apply_event_price_shocks(ev, assets)
     except Exception as e:
         logger.error(f"event generation failed: {e}")
 
@@ -293,6 +294,13 @@ async def _run_daily_generators(world_id: int, session: AsyncSession, day: int, 
             await stream.record_daily_bar(day, day_dt)
     except Exception as e:
         logger.error(f"record_daily_bar failed: {e}")
+
+    # 6) 挑战自动评估：按 constraints 逐项评估真实组合/行情，写 ChallengeProgress
+    try:
+        from app.services.challenge_service import evaluate_world_challenges
+        await evaluate_world_challenges(world_id, day, session)
+    except Exception as e:
+        logger.error(f"challenge evaluation failed: {e}")
 
 
 @router.post("/{world_id}/reset")

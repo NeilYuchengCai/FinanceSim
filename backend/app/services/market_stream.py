@@ -151,7 +151,8 @@ class MarketStream:
     """内存价格状态机 + WebSocket 广播。"""
 
     def __init__(self, tick_interval: float = TICK_INTERVAL,
-                 persist_interval: float = PERSIST_INTERVAL):
+                 persist_interval: float = PERSIST_INTERVAL,
+                 seed: Optional[int] = None):
         self.tick_interval = tick_interval
         self.persist_interval = persist_interval
         self._assets: Dict[str, _AssetState] = {}
@@ -160,6 +161,8 @@ class MarketStream:
         self._persist_task: Optional[asyncio.Task] = None
         self._running = False
         self._trading_cache: tuple[float, bool] = (0.0, True)
+        # 实例级随机源：同一 seed 下价格游走序列可复现（restore/重放一致）
+        self._rng = random.Random(seed)
 
     # ------------------------------------------------------------ 生命周期
     async def start(self) -> None:
@@ -353,7 +356,7 @@ class MarketStream:
             # 几何布朗运动 + 极弱均值回复
             sigma = state.sigma * vol_scale
             pull = -MEAN_REVERSION * math.log(state.price / state.anchor)
-            move = pull + sigma * random.gauss(0.0, 1.0) - 0.5 * sigma ** 2
+            move = pull + sigma * self._rng.gauss(0.0, 1.0) - 0.5 * sigma ** 2
             move = max(-MAX_TICK_MOVE, min(MAX_TICK_MOVE, move))
 
             new_price = max(state.price * math.exp(move), PRICE_FLOOR)
@@ -424,10 +427,10 @@ class MarketStream:
             )
             close_px = st.price
             # 当日高低在开收两端外扩一点，制造真实感
-            ext = random.uniform(0.002, 0.015)
+            ext = self._rng.uniform(0.002, 0.015)
             high_px = max(open_px, close_px) * (1.0 + ext)
             low_px = min(open_px, close_px) * (1.0 - ext)
-            vol = int(random.uniform(200_000, 8_000_000))
+            vol = int(self._rng.uniform(200_000, 8_000_000))
             bar_rows.append({
                 "asset_id": st.asset_id,
                 "timestamp": timestamp,
@@ -454,7 +457,7 @@ class MarketStream:
                 sa_text(
                     "INSERT INTO price_history "
                     "(asset_id, timestamp, open, high, low, close, volume, world_day, data_source) "
-                    "VALUES (:asset_id, :timestamp, :open, :high, :low, :close, :volume, :world_day, 'simulated')"
+                    "VALUES (:asset_id, :timestamp, :open, :high, :low, :close, :volume, :world_day, 'SIMULATED')"
                 ),
                 bar_rows,
             )
@@ -522,9 +525,13 @@ class MarketStream:
 _stream: Optional[MarketStream] = None
 
 
-def get_market_stream() -> MarketStream:
-    """进程内单例。"""
+def get_market_stream(seed: Optional[int] = None) -> MarketStream:
+    """进程内单例。
+
+    seed 仅在首次创建时生效（用于按世界种子复现价格演化）；
+    单例已存在时返回既有实例，忽略后续 seed 参数。
+    """
     global _stream
     if _stream is None:
-        _stream = MarketStream()
+        _stream = MarketStream(seed=seed)
     return _stream

@@ -91,6 +91,7 @@ class TradingEngine:
                     "quantity": float(qty),
                     "buyer_order_id": order.id if order.side == "BUY" else None,
                     "seller_order_id": order.id if order.side == "SELL" else None,
+                    "direction": side,
                     "timestamp": datetime.now(),
                 }
                 order.filled_quantity = order.original_quantity
@@ -102,6 +103,8 @@ class TradingEngine:
             trade["world_id"] = self.world_id
             trade["order_id_buy"] = trade.get("buyer_order_id")
             trade["order_id_sell"] = trade.get("seller_order_id")
+            # 成交方向：本次提交订单的一方视角（用户/Bot 落库与前端展示都需要）
+            trade.setdefault("direction", side)
             self.trades.append(trade)
             logger.info(f"Trade executed: {trade}")
 
@@ -119,6 +122,8 @@ class TradingEngine:
             "order_id": order_id,
             "ticker": ticker,
             "side": side,
+            # direction 与 side 同义：Bot 内存成交 dict / 前端展示统一取此键
+            "direction": side,
             "type": order_type,
             "quantity": float(quantity_dec),
             "price": float(price_dec) if price_dec else (float(order.price) if order.price else None),

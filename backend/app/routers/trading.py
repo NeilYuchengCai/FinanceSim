@@ -115,6 +115,7 @@ async def _persist_trading_state(
             order_id_sell=tr.get("order_id_sell"),
             price=float(tr.get("price") or 0),
             quantity=float(tr.get("quantity") or 0),
+            direction=tr.get("direction") or result["side"],
             timestamp=ts or datetime.now(),
             world_day=world.current_day,
         ))
@@ -372,6 +373,7 @@ async def list_trades(
             "ticker": tk,
             "price": t.price,
             "quantity": t.quantity,
+            "direction": t.direction,
             "timestamp": t.timestamp.isoformat() if t.timestamp else None,
             "order_id_buy": t.order_id_buy,
             "order_id_sell": t.order_id_sell,
@@ -398,6 +400,7 @@ async def list_trades(
             "ticker": tr.get("ticker"),
             "price": tr.get("price"),
             "quantity": tr.get("quantity"),
+            "direction": tr.get("direction") or ("BUY" if tr.get("buyer_order_id") else "SELL"),
             "timestamp": ts.isoformat() if isinstance(ts, datetime) else ts,
             "order_id_buy": tr.get("order_id_buy"),
             "order_id_sell": tr.get("order_id_sell"),

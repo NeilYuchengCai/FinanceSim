@@ -50,6 +50,9 @@ class Trade(Base):
     order_id_sell = Column(String(36), ForeignKey("orders.id"), nullable=True)
     price = Column(Float, nullable=False)
     quantity = Column(Float, nullable=False)
+    # 成交方向（相对发起方视角）：BUY / SELL。
+    # nullable=True 兼容历史行；新成交由 trading_engine.submit_order 注入。
+    direction = Column(String(10), nullable=True)
     timestamp = Column(DateTime(timezone=True), nullable=False, index=True)
     world_day = Column(Integer, nullable=True, index=True)
     

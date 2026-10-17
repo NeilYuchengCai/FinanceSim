@@ -252,6 +252,7 @@ class SnapshotService:
         )
 
         # 恢复资产最新价格（从快照中取每个资产的 latest_price）
+        snapshot_day = snapshot.snapshot_day
         for asset_data in state.get("assets", []):
             ticker = asset_data.get("ticker")
             latest_price = asset_data.get("latest_price")
@@ -261,9 +262,16 @@ class SnapshotService:
                 )
                 asset = asset_result.scalar_one_or_none()
                 if asset:
-                    # 删除该资产的所有价格历史，保留快照时的价格
+                    # 恢复现价：此前只删价格历史不更新 current_price，
+                    # 恢复后行情/交易/图表拿到的是快照之后的价格，与世界状态不自洽。
+                    asset.current_price = latest_price
+                    # 只删快照日之后产生的 bar（world_day 为 NULL 的种子数据
+                    # 不满足 > 条件，天然保留），使更早的K线得以留存。
                     await session.execute(
-                        sql_delete(PriceHistory).where(PriceHistory.asset_id == asset.id)
+                        sql_delete(PriceHistory).where(
+                            PriceHistory.asset_id == asset.id,
+                            PriceHistory.world_day > snapshot_day,
+                        )
                     )
 
         await session.commit()
@@ -329,6 +337,14 @@ class SnapshotService:
         for a in assets_result.scalars():
             asset_map[a.ticker] = a
 
+        # 旧世界 asset_id -> ticker 反查表：持仓快照里只有 asset_id，
+        # 而 asset_map 以 ticker 为键，必须经过本表反查 ticker 后才能命中。
+        id_to_ticker = {
+            a.get("id"): a.get("ticker")
+            for a in state.get("assets", [])
+            if a.get("id") is not None and a.get("ticker")
+        }
+
         for asset_data in state.get("assets", []):
             asset = asset_map.get(asset_data["ticker"])
             if asset and asset_data.get("latest_price"):
@@ -348,9 +364,12 @@ class SnapshotService:
 
         # 复制持仓
         for pos_data in state.get("positions", []):
-            asset = asset_map.get(str(pos_data.get("asset_id")))
+            ticker = id_to_ticker.get(pos_data.get("asset_id"))
+            asset = asset_map.get(ticker) if ticker else None
             if asset:
                 position = Position(
+                    # 主键为 String(36) UUID，无服务端默认值，必须显式生成
+                    id=str(uuid.uuid4()),
                     world_id=new_world_id,
                     asset_id=asset.id,
                     quantity=pos_data.get("quantity", 0),
@@ -362,7 +381,6 @@ class SnapshotService:
 
         # 复制事件
         for ev_data in state.get("events", []):
-            import uuid
             event = Event(
                 id=str(uuid.uuid4()),
                 world_id=new_world_id,
@@ -376,7 +394,6 @@ class SnapshotService:
 
         # 复制新闻
         for news_data in state.get("news", []):
-            import uuid
             news_item = News(
                 id=str(uuid.uuid4()),
                 world_id=new_world_id,

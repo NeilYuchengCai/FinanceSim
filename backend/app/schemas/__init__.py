@@ -31,6 +31,11 @@ class WorldResponse(BaseModel):
     created_at: datetime
     # 世界列表页要展示随机种子；缺这个字段时前端只能渲染 "-"
     seed: Optional[str] = None
+    # 初始资金/模拟速度/难度：前端交易页与模拟控制台需要按世界参数运行，
+    # 缺这三个字段时前端只能回退到硬编码默认值，与后端实际状态不一致。
+    starting_capital: float = 100000.0
+    simulation_speed: float = 1.0
+    difficulty: str = "normal"
 
     class Config:
         from_attributes = True
@@ -93,7 +98,7 @@ class PriceBar(BaseModel):
     low: float
     close: float
     volume: int
-    data_source: str = "simulated"
+    data_source: str = "SIMULATED"
 
 
 # ========== Order Schemas ==========
@@ -130,6 +135,8 @@ class TradeResponse(BaseModel):
     asset_ticker: str
     price: float
     quantity: float
+    # 成交方向（BUY/SELL）：历史行可能为 None
+    direction: Optional[str] = None
     timestamp: datetime
     order_id_buy: Optional[str]
     order_id_sell: Optional[str]
@@ -192,6 +199,8 @@ class NewsResponse(BaseModel):
     sentiment: Optional[float]
     affected_assets: Optional[List[str]]
     created_at: datetime
+    # 数据来源标注：新闻为模拟引擎生成（与 /news 口径一致）
+    data_source: str = "SIMULATED"
     
     class Config:
         from_attributes = True

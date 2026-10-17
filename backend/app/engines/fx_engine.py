@@ -47,6 +47,8 @@ class CurrencyPair:
             "change_24h": round(self._calculate_change(), 5),
             "high_24h": round(self.day_high, 5),
             "low_24h": round(self.day_low, 5),
+            # 数据来源标注：汇率全部为模拟引擎生成
+            "data_source": "SIMULATED",
         }
 
     def _calculate_change(self) -> float:

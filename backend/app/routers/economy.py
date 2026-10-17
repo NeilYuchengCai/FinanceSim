@@ -135,11 +135,13 @@ async def get_economic_indicators():
         },
         "inflation_indicators": {
             "cpi_inflation": state.inflation * 100,
-            "expected_inflation": state.inflation * 0.9 + 0.02 * 0.1  # 加权预期
+            # 加权预期（内部为小数，这里统一换算为百分数字面量，与 cpi_inflation 同口径）
+            "expected_inflation": (state.inflation * 0.9 + 0.02 * 0.1) * 100
         },
         "labor_market": {
             "unemployment_rate": state.unemployment * 100,
-            "natural_rate": 0.05
+            # 自然失业率：同为百分数字面量（5.0 表示 5%）
+            "natural_rate": 5.0
         },
         "monetary_policy": {
             "policy_rate": state.interest_rate * 100,

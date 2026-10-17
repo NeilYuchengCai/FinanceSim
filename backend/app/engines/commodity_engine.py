@@ -110,9 +110,11 @@ class CommodityEngine:
         "dollar_strength": {"name": "Stronger US Dollar", "impact_range": (-0.02, -0.005), "affected": ["GC", "SI", "HG", "ALI"]},
     }
 
-    def __init__(self):
+    def __init__(self, seed: Optional[int] = None):
         self.commodities: Dict[str, Dict] = {}
         self.price_history: Dict[str, List[Dict]] = {}
+        # 实例级随机源：同一 seed 下商品演化序列可复现
+        self._rng = random.Random(seed)
         self._configs: Dict[str, CommodityConfig] = self._load_seed_commodities()
         self._init_commodities()
 
@@ -185,7 +187,7 @@ class CommodityEngine:
             seasonal_adjustment = config.seasonality_factor - 1.0
 
             # 随机波动
-            random_change = random.gauss(0, config.volatility * volatility_mult)
+            random_change = self._rng.gauss(0, config.volatility * volatility_mult)
 
             # 综合价格变化
             total_change = random_change + supply_pressure + seasonal_adjustment * 0.0001
@@ -195,8 +197,8 @@ class CommodityEngine:
             state["last_update"] = datetime.now()
 
             # 更新供需
-            supply_shock = random.gauss(0, config.supply * 0.001)
-            demand_shock = random.gauss(0, config.demand * 0.001)
+            supply_shock = self._rng.gauss(0, config.supply * 0.001)
+            demand_shock = self._rng.gauss(0, config.demand * 0.001)
             state["supply"] = max(0, state["supply"] + supply_shock)
             state["demand"] = max(0, state["demand"] + demand_shock)
             state["inventory"] = max(0, state["inventory"] + state["supply"] - state["demand"])
@@ -205,10 +207,10 @@ class CommodityEngine:
             self.price_history[ticker].append({
                 "timestamp": state["last_update"].isoformat(),
                 "open": round(old_price, 4),
-                "high": round(max(old_price, new_price) * (1 + abs(random.gauss(0, config.volatility * 0.3))), 4),
-                "low": round(min(old_price, new_price) * (1 - abs(random.gauss(0, config.volatility * 0.3))), 4),
+                "high": round(max(old_price, new_price) * (1 + abs(self._rng.gauss(0, config.volatility * 0.3))), 4),
+                "low": round(min(old_price, new_price) * (1 - abs(self._rng.gauss(0, config.volatility * 0.3))), 4),
                 "close": round(new_price, 4),
-                "volume": int(random.randint(10000, 100000)),
+                "volume": int(self._rng.randint(10000, 100000)),
                 "supply": round(state["supply"], 2),
                 "demand": round(state["demand"], 2),
                 "inventory": round(state["inventory"], 2),
@@ -257,6 +259,8 @@ class CommodityEngine:
             "inventory": round(state["inventory"], 2),
             "change_pct": round(change_pct, 4),
             "last_update": state["last_update"].isoformat(),
+            # 数据来源标注：商品行情全部为模拟引擎生成
+            "data_source": "SIMULATED",
         }
 
     def get_all_commodities(self) -> List[Dict]:
@@ -281,7 +285,7 @@ class CommodityEngine:
             return {"error": f"Unknown shock type: {shock_type}"}
 
         low, high = shock["impact_range"]
-        base_impact = random.uniform(low, high) * magnitude
+        base_impact = self._rng.uniform(low, high) * magnitude
         affected = shock["affected"]
 
         results = {}
@@ -298,7 +302,7 @@ class CommodityEngine:
                 elif shock_type == "dollar_strength":
                     base_impact *= -1  # 美元走强，商品降价
 
-                impact = base_impact + random.gauss(0, 0.005)
+                impact = base_impact + self._rng.gauss(0, 0.005)
                 new_price = max(0.001, old_price * (1 + impact))
                 state["current_price"] = new_price
                 state["last_update"] = datetime.now()

@@ -78,36 +78,39 @@ class EventGenerator:
         "black_swan": ["All"]
     }
     
-    def __init__(self, world_id: int):
+    def __init__(self, world_id: int, seed: Optional[int] = None):
         self.world_id = world_id
         self.events: List[Event] = []
         self._day_counter = 0
-    
+        # 实例级随机源：同一 seed 下事件序列可复现（restore/重放不产生漂移）。
+        # seed 为 None 时退化为系统熵源，与旧行为一致。
+        self._rng = random.Random(seed)
+
     def generate_event(self, assets: List[Dict], sectors: List[str]) -> Event:
         """生成随机事件"""
-        event_type, event_category = random.choice(self.EVENT_TYPES)
-        severity = random.uniform(0.1, 1.0)
-        
+        event_type, event_category = self._rng.choice(self.EVENT_TYPES)
+        severity = self._rng.uniform(0.1, 1.0)
+
         # 根据事件类型调整严重程度
         if event_category == "CRISIS":
             severity = max(severity, 0.6)  # 危机事件至少中等强度
         elif event_category == "COMPANY":
             severity *= 0.6  # 公司事件强度减半
-        
+
         # 确定受影响资产
         affected_assets = []
         affected_sectors = []
-        
+
         if event_category == "COMPANY":
             # 公司级事件，影响单个或少数资产
-            n_affected = random.randint(1, min(3, len(assets)))
-            affected = random.sample(assets, n_affected)
+            n_affected = self._rng.randint(1, min(3, len(assets)))
+            affected = self._rng.sample(assets, n_affected)
             affected_assets = [a["ticker"] for a in affected]
             affected_sectors = list(set(a.get("sector", "Unknown") for a in affected))
         elif event_category == "MACRO":
             # 宏观事件，影响多个资产
-            n_affected = random.randint(5, min(20, len(assets)))
-            affected = random.sample(assets, n_affected)
+            n_affected = self._rng.randint(5, min(20, len(assets)))
+            affected = self._rng.sample(assets, n_affected)
             affected_assets = [a["ticker"] for a in affected]
             affected_sectors = list(set(a.get("sector", "Unknown") for a in assets))
         elif event_category == "CRISIS":
@@ -145,48 +148,48 @@ class EventGenerator:
     def _generate_macro_effect(self, event_type: str, severity: float) -> Dict:
         """生成宏观效应"""
         effects = {}
-        
+
         if event_type in ["inflation_shock", "employment_shock"]:
-            effects["inflation_impact"] = severity * random.uniform(0.005, 0.02)
-            effects["gdp_impact"] = -severity * random.uniform(0.002, 0.01)
+            effects["inflation_impact"] = severity * self._rng.uniform(0.005, 0.02)
+            effects["gdp_impact"] = -severity * self._rng.uniform(0.002, 0.01)
         elif event_type in ["central_bank", "geopolitical"]:
-            effects["rate_impact"] = severity * random.uniform(0.001, 0.005)
-            effects["risk_premium"] = severity * random.uniform(0.002, 0.01)
+            effects["rate_impact"] = severity * self._rng.uniform(0.001, 0.005)
+            effects["risk_premium"] = severity * self._rng.uniform(0.002, 0.01)
         elif event_type in ["liquidity_crisis", "banking_crisis"]:
-            effects["credit_spread"] = severity * random.uniform(0.01, 0.05)
-            effects["liquidity_premium"] = severity * random.uniform(0.005, 0.02)
+            effects["credit_spread"] = severity * self._rng.uniform(0.01, 0.05)
+            effects["liquidity_premium"] = severity * self._rng.uniform(0.005, 0.02)
         elif event_type == "black_swan":
-            effects["volatility_spike"] = severity * random.uniform(0.1, 0.3)
-            effects["risk_premium"] = severity * random.uniform(0.02, 0.05)
-        
+            effects["volatility_spike"] = severity * self._rng.uniform(0.1, 0.3)
+            effects["risk_premium"] = severity * self._rng.uniform(0.02, 0.05)
+
         return effects
-    
+
     def _calculate_sentiment(self, event_type: str, severity: float) -> float:
         """计算情绪影响"""
         positive_events = ["earnings", "product_launch", "ma"]
         negative_events = ["regulatory", "liquidity_crisis", "banking_crisis", "black_swan"]
-        
+
         if event_type in positive_events:
-            return random.uniform(0.2, 0.8) * severity
+            return self._rng.uniform(0.2, 0.8) * severity
         elif event_type in negative_events:
-            return random.uniform(-0.8, -0.2) * severity
+            return self._rng.uniform(-0.8, -0.2) * severity
         else:
-            return random.uniform(-1, 1) * severity
-    
+            return self._rng.uniform(-1, 1) * severity
+
     def _calculate_duration(self, event_type: str, severity: float) -> int:
         """计算事件持续时间（天数）"""
         if event_type in ["earnings", "product_launch", "guidance"]:
-            return random.randint(1, 3)
+            return self._rng.randint(1, 3)
         elif event_type in ["regulatory", "management_change", "ma"]:
-            return random.randint(3, 10)
+            return self._rng.randint(3, 10)
         elif event_type in ["geopolitical", "central_bank", "inflation_shock", "employment_shock"]:
-            return random.randint(5, 20)
+            return self._rng.randint(5, 20)
         elif event_type in ["liquidity_crisis", "banking_crisis"]:
-            return random.randint(10, 30)
+            return self._rng.randint(10, 30)
         elif event_type == "black_swan":
-            return random.randint(20, 60)
+            return self._rng.randint(20, 60)
         else:
-            return random.randint(1, 5)
+            return self._rng.randint(1, 5)
     
     def _generate_content(self, event_type: str, severity: float, 
                           affected: List[str], sectors: List[str]) -> Tuple[str, str]:

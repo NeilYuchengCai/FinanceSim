@@ -57,6 +57,8 @@ async def list_news(
             "source": "FINANCESIM",
             "created_at": n.created_at.isoformat() if n.created_at else None,
             "is_read": False,
+            # 数据来源标注：新闻由模拟新闻引擎基于真实行情/宏观生成
+            "data_source": "SIMULATED",
         }
         for n in news_rows
     ]

@@ -2,6 +2,7 @@
 FinanceSim Challenge Router
 挑战模式 API
 """
+from datetime import datetime
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -139,8 +140,9 @@ async def log_challenge_progress(
     # 检查是否完成
     if day >= challenge.target_days:
         challenge.status = "completed"
-        from datetime import datetime
-        challenge.completed_at = datetime.utcnow()
+        # 统一使用本地时区 aware/naive 一致的 datetime.now()，
+        # 避免 utcnow() 的 naive UTC 时间与其他 server_default=func.now() 混淆
+        challenge.completed_at = datetime.now()
 
     await session.commit()
     return {"message": "Progress logged", "day": day, "status": challenge.status}

@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.database import init_db, close_db
+from app.database import init_db, close_db, async_session_factory
 from app.config import settings
 from app.routers import worlds, assets, trading, simulation, analytics, events, search, economy, bonds, news as news_router, fx, bot, snapshots, challenges, commodities
 from app.routers import realtime as realtime_router
@@ -39,6 +39,24 @@ async def lifespan(app: FastAPI):
     logger.info("Initializing database...")
     await init_db()
     logger.info("Database initialized")
+
+    # 世界种子 -> 引擎随机源：默认世界（id=1）的 seed 经 crc32 转为整数，
+    # 注入事件/商品/行情流，使同一世界的模拟演化跨重启可复现；
+    # 取不到世界或 seed 时退化为固定默认值（仍然确定）。
+    sim_seed = 42
+    try:
+        from sqlalchemy import select as _select
+        from app.models import World as _World
+        import zlib
+        async with async_session_factory() as _seed_session:
+            _world = (await _seed_session.execute(
+                _select(_World).where(_World.id == 1)
+            )).scalar_one_or_none()
+            if _world is not None and _world.seed:
+                sim_seed = zlib.crc32(str(_world.seed).encode("utf-8"))
+                logger.info("World seed '%s' -> engine seed %d", _world.seed, sim_seed)
+    except Exception as e:
+        logger.warning(f"Failed to resolve world seed, using default {sim_seed}: {e}")
 
     # 每个引擎独立 try/except：单个引擎初始化失败只置 None + 记录日志，
     # 服务继续启动（路由层 503 分支接住），不再一损俱损。
@@ -112,7 +130,7 @@ async def lifespan(app: FastAPI):
     # 初始化事件引擎
     logger.info("Initializing Event Engine...")
     try:
-        _event_generator = EventGenerator(1)
+        _event_generator = EventGenerator(1, seed=sim_seed)
         _event_propagation = EventPropagation()
         events.init_event_engine(_event_generator, _event_propagation)
         logger.info("Event Engine initialized")
@@ -124,7 +142,7 @@ async def lifespan(app: FastAPI):
     # 初始化商品引擎
     logger.info("Initializing Commodity Engine...")
     try:
-        _commodity_engine = CommodityEngine()
+        _commodity_engine = CommodityEngine(seed=sim_seed)
         commodities.init_commodity_engine(_commodity_engine)
         logger.info("Commodity Engine initialized")
     except Exception as e:
@@ -134,7 +152,7 @@ async def lifespan(app: FastAPI):
     # 启动实时行情流：内存价格每秒小幅游走，供 /api/v1/ws/prices 推送
     logger.info("Starting market price stream...")
     try:
-        await get_market_stream().start()
+        await get_market_stream(seed=sim_seed).start()
         logger.info("Market price stream started")
     except Exception as e:
         logger.exception(f"Market price stream failed to start: {e}")

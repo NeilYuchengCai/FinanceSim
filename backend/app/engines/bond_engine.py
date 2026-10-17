@@ -37,15 +37,20 @@ class Bond:
     accrued_interest: float = 0.0
     next_coupon_date: datetime = field(default_factory=datetime.now)
     
-    def update(self, market_yield: float):
-        """根据市场收益率更新价格和久期"""
+    def update(self, market_yield: float, risk_free_rate: Optional[float] = None):
+        """根据市场收益率更新价格和久期。
+
+        risk_free_rate 为无风险利率（取自经济引擎 interest_rate）；
+        缺省时退化为 5% 的保守假设。spread = 市场收益率 - 无风险利率。
+        """
+        rf = 0.05 if risk_free_rate is None else float(risk_free_rate)
         # 先设置remaining_days，因为duration计算依赖它
         self.remaining_days = (self.maturity_date - datetime.now()).days
         self.yield_to_maturity = market_yield
         self.price = self._calculate_price(market_yield)
         self.duration = self._calculate_duration(market_yield)
         self.convexity = self._calculate_convexity(market_yield)
-        self.spread = market_yield - 0.05  # 假设无风险利率5%
+        self.spread = market_yield - rf
     
     def _calculate_price(self, ytm: float) -> float:
         """计算债券价格"""
@@ -136,7 +141,9 @@ class Bond:
             "duration": self.duration,
             "convexity": self.convexity,
             "spread": self.spread,
-            "accrued_interest": self.accrued_interest
+            "accrued_interest": self.accrued_interest,
+            # 数据来源标注：债券定价全部为模拟引擎生成
+            "data_source": "SIMULATED",
         }
 
 
@@ -198,15 +205,36 @@ class YieldCurve:
 
 class BondEngine:
     """债券引擎"""
-    
+
+    # 无风险利率缺省值：经济引擎不可用（离线/测试）时的保守假设
+    DEFAULT_RISK_FREE_RATE = 0.05
+
     def __init__(self):
         self.bonds: Dict[str, Bond] = {}
         self.yield_curve = YieldCurve()
         self.yield_curve._rebuild_curve()  # 初始化收益率曲线
         self.history: List[Dict] = []
-        
+        # 当前无风险利率：由经济引擎 interest_rate 同步，spread 计算以此为基准
+        self.risk_free_rate: float = self.DEFAULT_RISK_FREE_RATE
+
         # 初始化默认债券
         self._init_bonds()
+
+    def sync_risk_free_rate(self) -> float:
+        """从经济引擎同步无风险利率（interest_rate）。
+
+        经济引擎未初始化或读取失败时保持当前值，绝不抛异常——
+        债券引擎必须在任何环境下都可用。
+        """
+        try:
+            from app.routers.economy import _economic_engine
+            if _economic_engine is not None:
+                rate = float(_economic_engine.state.interest_rate)
+                if rate > 0:
+                    self.risk_free_rate = rate
+        except Exception as e:  # noqa: BLE001 - 同步失败保持原值
+            logger.debug(f"sync_risk_free_rate failed, keeping {self.risk_free_rate}: {e}")
+        return self.risk_free_rate
     
     # 当资产种子文件不可用时的兜底清单
     FALLBACK_BONDS = [
@@ -245,6 +273,8 @@ class BondEngine:
 
     def _init_bonds(self):
         """初始化债券"""
+        # 先同步无风险利率，使初始 spread 有真实基准
+        self.sync_risk_free_rate()
         rows = self._load_seed_bonds()
 
         if rows:
@@ -268,7 +298,7 @@ class BondEngine:
                         maturity_date=datetime.now() + timedelta(days=years * 365),
                         credit_rating=f.get("rating") or "AAA",
                     )
-                    bond.update(float(f.get("yield") or 0.05))
+                    bond.update(float(f.get("yield") or 0.05), self.risk_free_rate)
                     self.bonds[ticker] = bond
                 except Exception as e:
                     logger.warning(f"Skip seed bond {ticker}: {e}")
@@ -287,27 +317,33 @@ class BondEngine:
                 maturity_date=datetime.now() + timedelta(days=maturity * 365),
                 credit_rating=rating,
             )
-            bond.update(self.yield_curve.get_yield(maturity) + (0.01 if btype == "CORPORATE" else 0))
+            bond.update(
+                self.yield_curve.get_yield(maturity) + (0.01 if btype == "CORPORATE" else 0),
+                self.risk_free_rate,
+            )
             self.bonds[ticker] = bond
         logger.info(f"BondEngine initialized {len(self.bonds)} bonds from builtin list")
-    
+
     def step(self, days: int = 1, shocks: Optional[Dict] = None):
         """推进债券市场"""
         import random
-        
-        for _ in range(days):
+
+        # 每次推进前同步无风险利率，使 spread 跟随宏观利率演化
+        self.sync_risk_free_rate()
+
+        for day_index in range(days):
             # 收益率曲线移动
             rate_change = random.gauss(0, 0.0002)
-            
+
             # 应用冲击
             if shocks:
                 if "rate_hike" in shocks:
                     rate_change += shocks["rate_hike"] * 0.001
                 if "rate_cut" in shocks:
                     rate_change -= shocks["rate_cut"] * 0.001
-            
+
             self.yield_curve.shift(rate_change)
-            
+
             # 更新所有债券
             for ticker, bond in self.bonds.items():
                 base_yield = self.yield_curve.get_yield(bond.remaining_days / 365)
@@ -316,11 +352,12 @@ class BondEngine:
                 # 信用利差变化
                 if bond.bond_type == "CORPORATE" and shocks and "credit_spread_widen" in shocks:
                     spread += shocks["credit_spread_widen"] * 0.005
-                
-                bond.update(base_yield + spread)
-            
-            # 记录历史
-            if days % 5 == 0:
+
+                bond.update(base_yield + spread, self.risk_free_rate)
+
+            # 记录历史：每第 5 个模拟日记一次（按日内索引判断，
+            # 旧代码用总天数 days % 5 判断，多日步进时要么每步都记要么从不记）
+            if (day_index + 1) % 5 == 0:
                 self.history.append({
                     "date": datetime.now().isoformat(),
                     "yield_curve": self.yield_curve.get_tenors(),
@@ -345,7 +382,7 @@ class BondEngine:
             spread_map = {"AAA": 0.005, "AA": 0.01, "A": 0.015, "BBB": 0.025, "BB": 0.05, "B": 0.08, "CCC": 0.12}
             base_yield = self.yield_curve.get_yield(bond.remaining_days / 365)
             spread = spread_map.get(rating_change, 0.1)
-            bond.update(base_yield + spread)
+            bond.update(base_yield + spread, self.risk_free_rate)
             logger.info(f"Credit event: {ticker} rated {rating_change}")
 
 
