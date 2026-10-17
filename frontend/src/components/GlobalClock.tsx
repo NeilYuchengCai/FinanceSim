@@ -3,24 +3,23 @@ import { t } from '../i18n'
 import { useCurrentWorld } from '../hooks/useCurrentWorld'
 import './GlobalClock.css'
 
-const STORAGE_KEY = 'financesim-world-state'
-
-interface WorldState {
-  current_day: number
-  current_time: string
-  speed: string
-  is_paused: boolean
+// 英文星期几 -> i18n 键（中英文由字典提供）
+const WEEKDAY_KEYS: Record<string, string> = {
+  Monday: 'simulation.weekdayMonday',
+  Tuesday: 'simulation.weekdayTuesday',
+  Wednesday: 'simulation.weekdayWednesday',
+  Thursday: 'simulation.weekdayThursday',
+  Friday: 'simulation.weekdayFriday',
+  Saturday: 'simulation.weekdaySaturday',
+  Sunday: 'simulation.weekdaySunday',
 }
 
-// 星期几的中英文映射
-const WEEKDAY_EN_ZH: Record<string, string> = {
-  Monday: '周一',
-  Tuesday: '周二',
-  Wednesday: '周三',
-  Thursday: '周四',
-  Friday: '周五',
-  Saturday: '周六',
-  Sunday: '周日',
+// 市场状态 -> i18n 键（紧凑时钟用短标签）
+const MARKET_STATUS_KEYS: Record<string, string> = {
+  OPEN: 'simulation.statusOpen',
+  WEEKEND: 'simulation.statusWeekend',
+  CLOSED: 'simulation.statusClosed',
+  HOLIDAY: 'simulation.statusClosed',
 }
 
 function formatSimTime(iso?: string): string {
@@ -28,8 +27,9 @@ function formatSimTime(iso?: string): string {
   return iso.replace('T', ' ').slice(11, 19)
 }
 
-function getWeekdayCN(weekday?: string): string {
-  return weekday ? (WEEKDAY_EN_ZH[weekday] ?? weekday) : ''
+function getWeekdayLabel(weekday?: string): string {
+  const key = weekday ? WEEKDAY_KEYS[weekday] : undefined
+  return key ? t(key) : (weekday ?? '')
 }
 
 export default function GlobalClock() {
@@ -70,20 +70,20 @@ export default function GlobalClock() {
   }, [fetchStatus])
 
   const statusClass = marketStatus === 'OPEN' ? 'open' : marketStatus === 'WEEKEND' ? 'weekend' : 'closed'
-  const statusText = marketStatus === 'OPEN' ? '开市' : marketStatus === 'WEEKEND' ? '周末' : '休市'
+  const statusText = t(MARKET_STATUS_KEYS[marketStatus] ?? 'simulation.statusClosed')
 
   return (
     <div className="global-clock" title={`${t('simulation.title')} | Day ${day}`}>
       <div className="clock-top">
         <span className="clock-date">
-          {date} {getWeekdayCN(weekday)}
+          {date} {getWeekdayLabel(weekday)}
         </span>
         <span className={`clock-dot ${statusClass}`} title={`${marketStatus} · ${statusText}`} />
       </div>
       <div className="clock-time">{time}</div>
       <div className="clock-bottom">
         <span className="clock-chip">
-          {isPaused ? '⏸ 暂停' : `▶ ${speed}`}
+          {isPaused ? `⏸ ${t('simulation.paused')}` : `▶ ${speed}`}
         </span>
         <span className="clock-chip">Day {day}</span>
         <span className={`clock-status ${statusClass}`}>{statusText}</span>

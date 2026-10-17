@@ -67,6 +67,8 @@ export default function WorldCreator() {
   const toast = useToast()
   const [creatingMode, setCreatingMode] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<number | null>(null)
+  // 删除二次确认：自定义深色 modal（替代 window.confirm，保证主题一致）
+  const [deleteTarget, setDeleteTarget] = useState<World | null>(null)
 
   const loadWorlds = useCallback(async () => {
     setLoading(true)
@@ -121,13 +123,19 @@ export default function WorldCreator() {
     }
   }
 
-  const deleteWorld = async (world: World) => {
-    const isDefault = world.id === DEFAULT_WORLD_ID
-    const message = isDefault
-      ? `${t('world.confirmDeleteDefault')} "${world.name}"? ${t('world.confirmDeleteHint')}`
-      : `${t('world.confirmDelete')} "${world.name}"?`
+  // 打开自定义确认弹窗（不再使用 window.confirm）
+  const requestDeleteWorld = (world: World) => {
+    setDeleteTarget(world)
+  }
 
-    if (!window.confirm(message)) return
+  const closeDeleteModal = () => {
+    if (deletingId !== null) return // 删除进行中不允许关闭
+    setDeleteTarget(null)
+  }
+
+  const confirmDeleteWorld = async () => {
+    const world = deleteTarget
+    if (!world) return
 
     setDeletingId(world.id)
     try {
@@ -138,6 +146,7 @@ export default function WorldCreator() {
         setWorldId(DEFAULT_WORLD_ID)
       }
       toast.success(`${world.name} ${t('world.deleted')}`)
+      setDeleteTarget(null)
     } catch (err) {
       toast.error(toErrorMessage(err))
     } finally {
@@ -270,7 +279,7 @@ export default function WorldCreator() {
                           disabled={deletingId === world.id}
                           onClick={e => {
                             e.stopPropagation()
-                            deleteWorld(world)
+                            requestDeleteWorld(world)
                           }}
                         >
                           {deletingId === world.id
@@ -286,6 +295,70 @@ export default function WorldCreator() {
           </div>
         )}
       </div>
+
+      {/* 删除世界二次确认弹窗（深色主题，与全局 CSS 变量一致） */}
+      {deleteTarget && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+          }}
+          onClick={closeDeleteModal}
+        >
+          <div
+            className="card"
+            style={{
+              width: 420,
+              maxWidth: '90vw',
+              background: 'var(--bg-secondary)',
+              border: '1px solid var(--border-color)',
+              borderRadius: 8,
+              padding: 24,
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <h3 style={{ margin: '0 0 12px', color: 'var(--text-primary)' }}>
+              {deleteTarget.id === DEFAULT_WORLD_ID
+                ? t('world.confirmDeleteDefault')
+                : t('world.confirmDelete')}
+            </h3>
+            <p style={{ margin: '0 0 8px', color: 'var(--text-primary)' }}>
+              “{deleteTarget.name}”
+            </p>
+            {deleteTarget.id === DEFAULT_WORLD_ID && (
+              <p style={{ margin: '0 0 8px', color: 'var(--accent-red)', fontSize: 13 }}>
+                {t('world.confirmDeleteHint')}
+              </p>
+            )}
+            <p style={{ margin: '0 0 20px', color: 'var(--text-secondary)', fontSize: 13 }}>
+              {t('world.deleteWarning')}
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+              <button className="btn btn-secondary" onClick={closeDeleteModal} disabled={deletingId !== null}>
+                {t('common.cancel')}
+              </button>
+              <button
+                className="btn"
+                style={{
+                  color: 'var(--accent-red)',
+                  background: 'rgba(248, 81, 73, 0.10)',
+                  border: '1px solid rgba(248, 81, 73, 0.4)',
+                  opacity: deletingId !== null ? 0.6 : 1,
+                }}
+                onClick={confirmDeleteWorld}
+                disabled={deletingId !== null}
+              >
+                {deletingId !== null ? t('common.loading') : t('common.delete')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

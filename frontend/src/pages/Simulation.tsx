@@ -52,28 +52,34 @@ const MARKET_TAG_CLASS: Record<string, string> = {
   HOLIDAY: 'tag-red',
 }
 
-// 市场状态的中文说明
-const MARKET_LABEL_CN: Record<string, string> = {
-  OPEN: '交易日 · 开市',
-  CLOSED: '交易日 · 非交易时段',
-  WEEKEND: '周末休市',
-  HOLIDAY: '节假日休市',
+// 英文星期几 -> i18n 键（中英文由字典提供）
+const WEEKDAY_KEYS: Record<string, string> = {
+  Monday: 'simulation.weekdayMonday',
+  Tuesday: 'simulation.weekdayTuesday',
+  Wednesday: 'simulation.weekdayWednesday',
+  Thursday: 'simulation.weekdayThursday',
+  Friday: 'simulation.weekdayFriday',
+  Saturday: 'simulation.weekdaySaturday',
+  Sunday: 'simulation.weekdaySunday',
 }
 
-// 英文星期几 -> 中文兜底
-const WEEKDAY_CN: Record<string, string> = {
-  Monday: '周一',
-  Tuesday: '周二',
-  Wednesday: '周三',
-  Thursday: '周四',
-  Friday: '周五',
-  Saturday: '周六',
-  Sunday: '周日',
+// 市场状态 -> i18n 键
+const MARKET_LABEL_KEYS: Record<string, string> = {
+  OPEN: 'simulation.marketOpen',
+  CLOSED: 'simulation.marketClosed',
+  WEEKEND: 'simulation.marketWeekend',
+  HOLIDAY: 'simulation.marketHoliday',
 }
 
 const marketTagClass = (s?: string) => MARKET_TAG_CLASS[s ?? ''] ?? 'tag-blue'
-const marketLabelCn = (s?: string) => MARKET_LABEL_CN[s ?? ''] ?? ''
-const weekdayCn = (w?: string) => (w ? WEEKDAY_CN[w] ?? '' : '')
+const marketLabel = (s?: string) => {
+  const key = MARKET_LABEL_KEYS[s ?? '']
+  return key ? t(key) : ''
+}
+const weekdayLabel = (w?: string) => {
+  const key = w ? WEEKDAY_KEYS[w] : undefined
+  return key ? t(key) : ''
+}
 
 interface EconomyState {
   cycle_phase: string
@@ -301,7 +307,7 @@ export default function Simulation() {
             </div>
             <div className="stat-change">
               {status?.weekday
-                ? `${status.weekday}${weekdayCn(status.weekday) ? ` · ${weekdayCn(status.weekday)}` : ''}`
+                ? `${status.weekday}${weekdayLabel(status.weekday) ? ` · ${weekdayLabel(status.weekday)}` : ''}`
                 : '—'}
             </div>
           </div>
@@ -313,7 +319,7 @@ export default function Simulation() {
               <span className={`tag ${marketTagClass(status?.market_status)}`}>
                 {status?.market_status ?? '—'}
               </span>
-              <span className="stat-change">{marketLabelCn(status?.market_status)}</span>
+              <span className="stat-change">{marketLabel(status?.market_status)}</span>
               {status?.holiday_name ? (
                 <span className="tag tag-red">{status.holiday_name}</span>
               ) : null}

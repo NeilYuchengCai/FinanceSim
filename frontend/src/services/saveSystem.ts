@@ -1,6 +1,4 @@
-import { useState, useEffect } from 'react'
 import axios from 'axios'
-import { t } from '../i18n'
 import { readWorldIdFromStorage } from '../hooks/useCurrentWorld'
 
 const STORAGE_KEY_PREFIX = 'financesim-save-'
@@ -120,13 +118,12 @@ export function getSaveList(): SaveSlot[] {
   return saves.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
 }
 
-// 删除存档
+// 删除存档（存档不存在时返回 false）
 export function deleteSave(saveId: string): boolean {
   const key = `${STORAGE_KEY_PREFIX}${saveId}`
-  if (localStorage.removeItem(key)) {
-    return true
-  }
-  return false
+  if (localStorage.getItem(key) === null) return false
+  localStorage.removeItem(key)
+  return true
 }
 
 // 自动存档（每天切换时触发，带 5 秒防抖）

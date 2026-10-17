@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Fragment } from 'react'
 import axios from 'axios'
-import { t } from '../i18n'
+import { t, useLanguage } from '../i18n'
 
 interface NewsItem {
   id: string
@@ -14,20 +14,51 @@ interface NewsItem {
   is_read: boolean
 }
 
+// 后端 NewsImportance 枚举实际值（news_engine.py）：BREAKING/MAJOR/MARKET/COMPANY/MACRO/MINOR
+const IMPORTANCE_VALUES = ['BREAKING', 'MAJOR', 'MARKET', 'COMPANY', 'MACRO', 'MINOR'] as const
+
+const IMPORTANCE_TAG_CLASS: Record<string, string> = {
+  BREAKING: 'tag-red',
+  MAJOR: 'tag-orange',
+  MARKET: 'tag-blue',
+  COMPANY: 'tag-gray',
+  MACRO: 'tag-purple',
+  MINOR: 'tag-gray',
+}
+
+function importanceTagClass(imp: string): string {
+  return IMPORTANCE_TAG_CLASS[imp] || 'tag-gray'
+}
+
+function importanceLabel(imp: string): string {
+  const map: Record<string, string> = {
+    BREAKING: t('news.breaking'),
+    MAJOR: t('news.major'),
+    MARKET: t('news.market'),
+    COMPANY: t('news.company'),
+    MACRO: t('news.economy'),
+    MINOR: t('news.minor'),
+  }
+  return map[imp] || imp
+}
+
 export default function News() {
+  const { language } = useLanguage()
   const [news, setNews] = useState<NewsItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState('all')
+  const [expandedId, setExpandedId] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const params: any = { limit: 50 }
-        if (filter !== 'all') params.category = filter
+        const params: Record<string, string | number> = { limit: 50 }
+        if (filter !== 'all') params.importance = filter
         const newsRes = await axios.get('/api/v1/news', { params })
-        setNews(newsRes.data || [])
-      } catch (err) {
+        setNews(Array.isArray(newsRes.data) ? newsRes.data : [])
+        setError(null)
+      } catch {
         setError(t('common.networkError'))
       } finally {
         setLoading(false)
@@ -36,38 +67,24 @@ export default function News() {
     fetchData()
   }, [filter])
 
-  const getImportanceTag = (imp: string) => {
-    const map: Record<string, string> = {
-      BREAKING: 'tag-red',
-      MAJOR: 'tag-orange',
-      IMPORTANT: 'tag-blue',
-      MARKET: 'tag-gray',
-      COMPANY: 'tag-gray',
-      MACRO: 'tag-purple'
-    }
-    return map[imp] || 'tag-gray'
+  const formatTime = (value: string): string => {
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return '—'
+    return date.toLocaleString(language === 'zh' ? 'zh-CN' : 'en-US')
   }
 
-  const getImportanceLabel = (imp: string) => {
-    const map: Record<string, string> = {
-      BREAKING: t('news.breaking'),
-      MAJOR: t('news.important'),
-      IMPORTANT: t('news.important'),
-      MARKET: t('news.market'),
-      COMPANY: t('news.company'),
-      MACRO: t('news.economy')
-    }
-    return map[imp] || imp
-  }
+  const header = (
+    <div className="page-header">
+      <h2>{t('news.title')}</h2>
+      <p className="subtitle">{t('news.subtitle')}</p>
+    </div>
+  )
 
   if (loading) {
     return (
       <div>
-        <div className="page-header">
-          <h2>{t('news.title')}</h2>
-          <p className="subtitle">{t('news.subtitle')}</p>
-        </div>
-        <div className="card"><div className="loading" style={{padding: 40}}>{t('common.loading')}</div></div>
+        {header}
+        <div className="card"><div className="loading" style={{ padding: 40 }}>{t('common.loading')}</div></div>
       </div>
     )
   }
@@ -75,21 +92,15 @@ export default function News() {
   if (error) {
     return (
       <div>
-        <div className="page-header">
-          <h2>{t('news.title')}</h2>
-          <p className="subtitle">{t('news.subtitle')}</p>
-        </div>
-        <div className="card"><div className="error" style={{padding: 40}}>{error}</div></div>
+        {header}
+        <div className="card"><div className="error" style={{ padding: 40 }}>{error}</div></div>
       </div>
     )
   }
 
   return (
     <div>
-      <div className="page-header">
-        <h2>{t('news.title')}</h2>
-        <p className="subtitle">{t('news.subtitle')}</p>
-      </div>
+      {header}
 
       <div className="card">
         <div className="card-header">
@@ -101,12 +112,9 @@ export default function News() {
             onChange={(e) => setFilter(e.target.value)}
           >
             <option value="all">{t('common.all')}</option>
-            <option value="BREAKING">{t('news.breaking')}</option>
-            <option value="MAJOR">{t('news.important')}</option>
-            <option value="IMPORTANT">{t('news.important')}</option>
-            <option value="MARKET">{t('news.market')}</option>
-            <option value="COMPANY">{t('news.company')}</option>
-            <option value="MACRO">{t('news.economy')}</option>
+            {IMPORTANCE_VALUES.map(v => (
+              <option key={v} value={v}>{importanceLabel(v)}</option>
+            ))}
           </select>
         </div>
 
@@ -122,24 +130,49 @@ export default function News() {
           </thead>
           <tbody>
             {news.length > 0 ? (
-              news.map(item => (
-                <tr key={item.id}>
-                  <td>{new Date(item.created_at).toLocaleString('zh-CN')}</td>
-                  <td>{item.headline}</td>
-                  <td>
-                    <span className={`tag ${getImportanceTag(item.importance)}`}>
-                      {getImportanceLabel(item.importance)}
-                    </span>
-                  </td>
-                  <td className={item.sentiment > 0.3 ? 'positive' : item.sentiment < -0.3 ? 'negative' : ''}>
-                    {item.sentiment.toFixed(2)}
-                  </td>
-                  <td>
-                    {item.affected_assets?.slice(0, 2).join(', ')}
-                    {item.affected_assets?.length > 2 && ` +${item.affected_assets.length - 2}`}
-                  </td>
-                </tr>
-              ))
+              news.map(item => {
+                const expanded = expandedId === item.id
+                return (
+                  <Fragment key={item.id}>
+                    <tr
+                      onClick={() => setExpandedId(expanded ? null : item.id)}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <td>{formatTime(item.created_at)}</td>
+                      <td>{item.headline}</td>
+                      <td>
+                        <span className={`tag ${importanceTagClass(item.importance)}`}>
+                          {importanceLabel(item.importance)}
+                        </span>
+                      </td>
+                      <td className={item.sentiment > 0.3 ? 'positive' : item.sentiment < -0.3 ? 'negative' : ''}>
+                        {item.sentiment.toFixed(2)}
+                      </td>
+                      <td>
+                        {item.affected_assets?.slice(0, 2).join(', ')}
+                        {item.affected_assets?.length > 2 && ` +${item.affected_assets.length - 2}`}
+                      </td>
+                    </tr>
+                    {expanded && (
+                      <tr>
+                        <td colSpan={5} style={{ background: 'var(--bg-secondary)', whiteSpace: 'pre-wrap' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '8px 0' }}>
+                            <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
+                              {t('news.category')}: {item.category || '—'} · {t('news.sentiment')}: {item.sentiment.toFixed(2)}
+                            </div>
+                            <div>{item.body || t('news.noBody')}</div>
+                            {item.affected_assets && item.affected_assets.length > 0 && (
+                              <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
+                                {t('news.affectedAssets')}: {item.affected_assets.join(', ')}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                )
+              })
             ) : (
               <tr><td colSpan={5} className="loading">{t('common.noData')}</td></tr>
             )}

@@ -152,12 +152,22 @@ export default function Settings() {
               value={settings.dataSource}
               onChange={(e) => persist({ dataSource: e.target.value as DataSourceValue })}
             >
-              {DATA_SOURCE_OPTIONS.map(source => (
-                <option key={source} value={source}>
-                  {source === 'fallback' ? t('settings.fallback') : DATA_SOURCE_LABELS[source]}
-                </option>
-              ))}
+              {DATA_SOURCE_OPTIONS.map(source => {
+                // 后端目前仅产出模拟数据（各引擎 data_source = "SIMULATED"），
+                // 外部数据源尚未接入：置灰标注，避免用户误选后以为生效。
+                const integrated = source === 'fallback'
+                return (
+                  <option key={source} value={source} disabled={!integrated}>
+                    {source === 'fallback'
+                      ? t('settings.fallback')
+                      : `${DATA_SOURCE_LABELS[source]} ${t('settings.dataSourceNotIntegrated')}`}
+                  </option>
+                )
+              })}
             </select>
+            <p className="subtitle" style={{ marginTop: 6 }}>
+              {t('settings.dataSourceHint')}
+            </p>
           </div>
         </div>
       </div>
