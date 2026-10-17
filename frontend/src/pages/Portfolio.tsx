@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import axios from 'axios'
-import { t, formatCurrency } from '../i18n'
+import { t } from '../i18n'
 import { useCurrentWorld } from '../hooks/useCurrentWorld'
 import { usePriceStream } from '../hooks/usePriceStream'
+import { useSettings } from '../hooks/useSettings'
+import { formatMoney } from '../services/money'
 import PieChartComponent from '../components/charts/PieChartComponent'
 
 /**
@@ -57,12 +59,14 @@ interface WorldInfo {
 // 后端 /worlds/{id} 未返回 starting_capital 时，按后端 WorldCreate 默认初始资金计算
 const FALLBACK_STARTING_CAPITAL = 100000
 
-const money = (v: number) => formatCurrency(Number.isFinite(v) ? v : 0)
+const money = (v: number) => formatMoney(Number.isFinite(v) ? v : 0, 'USD')
 const pct = (v: number) => `${(Number.isFinite(v) ? v : 0).toFixed(2)}%`
 
 export default function Portfolio() {
   const { worldId } = useCurrentWorld()
   const { prices } = usePriceStream()
+  // 订阅展示货币：切换货币时重新渲染，金额按 FX 汇率重估
+  useSettings()
   const [summary, setSummary] = useState<PortfolioSummary | null>(null)
   const [positions, setPositions] = useState<Position[]>([])
   const [startingCapital, setStartingCapital] = useState(FALLBACK_STARTING_CAPITAL)

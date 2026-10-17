@@ -194,7 +194,43 @@ class FXEngine:
     def get_all_pairs(self) -> List[Dict]:
         """获取所有货币对"""
         return [pair.to_dict() for pair in self.pairs.values()]
-    
+
+    def get_usd_rates(self) -> Dict[str, float]:
+        """返回以 USD 为基准的汇率表：rate[X] = 1 单位 X 等于多少 USD。
+
+        前端据此把任意币种金额换算到用户选中的展示货币（USD 枢纽交叉汇率）。
+        规则：
+        - ticker 形如 BASE/QUOTE，price = 每 1 BASE 可换多少 QUOTE。
+        - 若 quote == "USD"：rate[base] = price（price 即 USD/base）。
+        - 若 base  == "USD"：rate[quote] = 1/price（price 即 quote/USD → USD/quote）。
+        - 第二遍用已知汇率补全交叉盘（如 EUR/GBP）能推导的币种。
+        """
+        rates: Dict[str, float] = {"USD": 1.0}
+        for pair in self.pairs.values():
+            base, quote, price = pair.base, pair.quote, pair.price
+            if price <= 0:
+                continue
+            if quote == "USD":
+                rates.setdefault(base, price)
+            elif base == "USD":
+                rates.setdefault(quote, 1.0 / price)
+
+        # 第二遍：用已知汇率补全交叉盘能推导的币种（USD 枢纽）
+        for pair in self.pairs.values():
+            base, quote, price = pair.base, pair.quote, pair.price
+            if price <= 0 or base == quote:
+                continue
+            if base in rates and quote not in rates:
+                # price = quote per base → USD per quote = USD per base / price
+                rates.setdefault(quote, rates[base] / price)
+            elif quote in rates and base not in rates:
+                rates.setdefault(base, rates[quote] * price)
+
+        # 兜底：对仍缺失的展示货币（极少见）给 1.0，转换器会按"不变"处理而非崩溃
+        for code in ("EUR", "CNY", "CHF", "GBP", "JPY"):
+            rates.setdefault(code, 1.0)
+        return rates
+
     def get_price_history(self, ticker: str, limit: int = 100) -> List[Dict]:
         """获取历史价格"""
         ticker = self.normalize_ticker(ticker)

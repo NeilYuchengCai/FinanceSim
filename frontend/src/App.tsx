@@ -9,6 +9,7 @@ import { ToastProvider } from './components/Toast'
 import { allLazyRoutes } from './routes'
 import { t, useLanguage } from './i18n'
 import { restoreLatestSave } from './services/saveSystem'
+import { loadFxRates } from './services/fxRates'
 
 // Loading 组件
 const PageLoader = () => (
@@ -39,6 +40,10 @@ function App() {
   useEffect(() => {
     restoreLatestSave().catch((err) => {
       console.warn('Failed to restore latest save:', err)
+    })
+    // 预拉取 FX 汇率，供"展示货币切换"实时换算（失败则退化为不换算，不影响运行）
+    loadFxRates().catch((err) => {
+      console.warn('Failed to load FX rates:', err)
     })
   }, [])
 

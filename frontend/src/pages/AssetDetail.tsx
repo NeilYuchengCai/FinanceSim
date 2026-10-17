@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import axios from 'axios'
-import { t } from '../i18n'
+import { t, type CurrencyCode } from '../i18n'
 import { useCurrentWorld } from '../hooks/useCurrentWorld'
 import { usePriceQuote } from '../hooks/usePriceStream'
+import { useSettings } from '../hooks/useSettings'
+import { formatMoney, formatMoneyCompact } from '../services/money'
 import OHLCChart from '../components/charts/OHLCChart'
 import ErrorBoundary from '../components/ErrorBoundary'
 import OrderForm from '../components/OrderForm'
@@ -54,14 +56,6 @@ interface OrderBook {
 }
 
 const HISTORY_LIMIT = 120
-
-function formatCompact(value: number | null | undefined): string {
-  if (value === null || value === undefined || !Number.isFinite(value)) return '—'
-  if (Math.abs(value) >= 1e12) return `${(value / 1e12).toFixed(2)}T`
-  if (Math.abs(value) >= 1e8) return `${(value / 1e8).toFixed(2)}亿`
-  if (Math.abs(value) >= 1e4) return `${(value / 1e4).toFixed(2)}万`
-  return value.toLocaleString()
-}
 
 export default function AssetDetail() {
   const { ticker: encodedTicker } = useParams<{ ticker: string }>()
@@ -118,6 +112,9 @@ export default function AssetDetail() {
 
   const displayPrice = quote?.price ?? asset?.current_price ?? null
   const changePct = quote?.changePct ?? null
+  // 订阅展示货币：切换货币时重渲染，价格/市值按 FX 汇率重估
+  useSettings()
+  const assetCurrency = (asset?.currency ?? 'USD') as CurrencyCode
 
   const header = (
     <div className="page-header">
@@ -131,7 +128,7 @@ export default function AssetDetail() {
             className={changePct !== null && changePct >= 0 ? 'cn-up' : changePct !== null ? 'cn-down' : ''}
             style={{ fontSize: '1.4em', fontWeight: 600 }}
           >
-            {displayPrice.toLocaleString()}
+            {formatMoney(displayPrice, assetCurrency)}
             {changePct !== null ? ` (${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}%)` : ''}
           </span>
         ) : (
@@ -173,7 +170,7 @@ export default function AssetDetail() {
     { label: t('equities.sector'), value: asset.sector ?? '—' },
     { label: t('assetDetail.industry'), value: asset.industry ?? '—' },
     { label: t('assetDetail.currency'), value: asset.currency },
-    { label: t('equities.marketCap'), value: formatCompact(asset.market_cap) },
+    { label: t('equities.marketCap'), value: asset.market_cap != null ? formatMoneyCompact(asset.market_cap, assetCurrency) : '—' },
     { label: t('analytics.beta'), value: asset.beta != null ? asset.beta.toFixed(2) : '—' },
     { label: t('analytics.volatility'), value: asset.volatility != null ? `${(asset.volatility * 100).toFixed(2)}%` : '—' },
   ]
@@ -192,7 +189,7 @@ export default function AssetDetail() {
       <>
         {levels.map((lv, i) => (
           <tr key={`${side}-${i}`}>
-            <td className={side === 'bid' ? 'cn-up' : 'cn-down'}>{lv.price.toLocaleString()}</td>
+            <td className={side === 'bid' ? 'cn-up' : 'cn-down'}>{formatMoney(lv.price, assetCurrency)}</td>
             <td>{lv.quantity}</td>
           </tr>
         ))}

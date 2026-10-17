@@ -1,21 +1,14 @@
-import { useState } from 'react'
 import {
   t,
   useLanguage,
   formatCurrency,
   CURRENCIES,
-  isCurrencyCode,
 } from '../i18n'
 import type { CurrencyCode, LanguageCode } from '../i18n'
 import { useTheme } from '../hooks/useTheme'
 import type { ThemeMode } from '../hooks/useTheme'
-import { useToast } from '../components/Toast'
-
-const SETTINGS_STORAGE_KEY = 'financesim-settings'
-
-// Aligned with backend: /api/v1/simulation/{world_id}/speed?speed=X1
-const SPEED_OPTIONS = ['X1', 'X10', 'X100', 'X1000'] as const
-const DATA_SOURCE_OPTIONS = ['fallback', 'alpha-vantage', 'fred', 'frankfurter'] as const
+import { useSettings, updateSettings, SPEED_OPTIONS, DATA_SOURCE_OPTIONS } from '../hooks/useSettings'
+import type { SpeedValue, DataSourceValue } from '../hooks/useSettings'
 
 const DATA_SOURCE_LABELS: Record<string, string> = {
   fallback: 'Built-in Data',
@@ -24,57 +17,11 @@ const DATA_SOURCE_LABELS: Record<string, string> = {
   frankfurter: 'Frankfurter',
 }
 
-type SpeedValue = typeof SPEED_OPTIONS[number]
-type DataSourceValue = typeof DATA_SOURCE_OPTIONS[number]
-
-interface AppSettings {
-  currency: CurrencyCode
-  defaultSpeed: SpeedValue
-  dataSource: DataSourceValue
-}
-
-const DEFAULT_SETTINGS: AppSettings = {
-  currency: 'USD',
-  defaultSpeed: 'X10',
-  dataSource: 'fallback',
-}
-
-function loadSettings(): AppSettings {
-  try {
-    const raw = localStorage.getItem(SETTINGS_STORAGE_KEY)
-    if (!raw) return DEFAULT_SETTINGS
-    const parsed = JSON.parse(raw) || {}
-    return {
-      currency: isCurrencyCode(parsed.currency) ? parsed.currency : DEFAULT_SETTINGS.currency,
-      defaultSpeed: SPEED_OPTIONS.includes(parsed.defaultSpeed)
-        ? parsed.defaultSpeed
-        : DEFAULT_SETTINGS.defaultSpeed,
-      dataSource: DATA_SOURCE_OPTIONS.includes(parsed.dataSource)
-        ? parsed.dataSource
-        : DEFAULT_SETTINGS.dataSource,
-    }
-  } catch {
-    return DEFAULT_SETTINGS
-  }
-}
-
 export default function Settings() {
   const { theme, setTheme } = useTheme()
   const { language, setLanguage } = useLanguage()
-  const toast = useToast()
-  const [settings, setSettings] = useState<AppSettings>(loadSettings)
-
-  const persist = (patch: Partial<AppSettings>) => {
-    const next = { ...settings, ...patch }
-    setSettings(next)
-    try {
-      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(next))
-    } catch {
-      /* storage unavailable - keep in-memory state */
-    }
-    // 保存提示统一走全局 toast（Wave 1：深色主题右上角）
-    toast.success(t('settings.saved'))
-  }
+  const settings = useSettings()
+  const persist = (patch: Parameters<typeof updateSettings>[0]) => updateSettings(patch)
 
   return (
     <div>

@@ -31,6 +31,21 @@ async def list_pairs():
     return engine.get_all_pairs()
 
 
+@router.get("/rates")
+async def get_rates():
+    """以 USD 为基准的汇率表（rate[X] = 1 单位 X 折合多少 USD）。
+
+    前端用它把任意币种金额换算到用户选中的展示货币。
+    所有展示货币（USD/EUR/CNY/CHF 等）在种子/默认货币对里均有通往 USD 的路径。
+    """
+    engine = _require_engine()
+    return {
+        "base": "USD",
+        "rates": engine.get_usd_rates(),
+        "data_source": "SIMULATED",
+    }
+
+
 @router.get("/pair/{ticker:path}/history")
 async def get_history(
     ticker: str,

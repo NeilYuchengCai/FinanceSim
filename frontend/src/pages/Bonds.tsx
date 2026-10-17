@@ -4,6 +4,8 @@ import axios from 'axios'
 import { t } from '../i18n'
 import { usePriceStream, usePriceStreamPaused } from '../hooks/usePriceStream'
 import { useCurrentWorld } from '../hooks/useCurrentWorld'
+import { useSettings } from '../hooks/useSettings'
+import { formatMoney } from '../services/money'
 import { bondsApi } from '../services/api'
 import YieldCurveChart from '../components/charts/YieldCurveChart'
 
@@ -37,6 +39,8 @@ export default function Bonds() {
   const [yieldError, setYieldError] = useState<string | null>(null)
   const { prices, connected } = usePriceStream()
   const paused = usePriceStreamPaused()
+  // 订阅展示货币变化：切换货币时债券价格按实时汇率重估
+  useSettings()
 
   useEffect(() => {
     const fetchBonds = async () => {
@@ -191,7 +195,7 @@ export default function Bonds() {
                     const ch = live ? live.changePct : 0
                     return (
                       <span style={{ color: ch >= 0 ? 'var(--accent-green)' : 'var(--accent-red)', fontFamily: 'monospace' }}>
-                        {dp.toFixed(2)}
+                        {formatMoney(dp, 'USD')}
                       </span>
                     )
                   })()}

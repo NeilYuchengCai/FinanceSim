@@ -91,7 +91,7 @@ function QuoteTable({ rows, valueLabel }: { rows: Quote[]; valueLabel: string })
           >
             <td>{r.ticker}</td>
             <td>
-              <LivePrice ticker={r.ticker} fallback={r.price} format={(v) => v.toLocaleString()} />
+              <LivePrice ticker={r.ticker} fallback={r.price} />
             </td>
             <td>
               <LiveChange ticker={r.ticker} fallback={r.change_pct} format={pct} />
@@ -207,7 +207,7 @@ export default function Markets() {
               </span>
             </div>
             <div className="stat-value">
-              <LivePrice ticker={idx.ticker} fallback={idx.price} format={(v) => v.toLocaleString()} />
+              <LivePrice ticker={idx.ticker} fallback={idx.price} />
             </div>
             <div className={`stat-change ${dirClass(idx.change_pct)}`}>{idx.ticker}</div>
           </div>
@@ -369,7 +369,7 @@ export default function Markets() {
                 <td>{idx.ticker}</td>
                 <td>{idx.name}</td>
                 <td>
-                  <LivePrice ticker={idx.ticker} fallback={idx.price} format={(v) => v.toLocaleString()} />
+                  <LivePrice ticker={idx.ticker} fallback={idx.price} />
                 </td>
                 <td>
                   <LiveChange ticker={idx.ticker} fallback={idx.change_pct} format={pct} />

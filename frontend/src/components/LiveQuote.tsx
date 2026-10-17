@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { usePriceQuote } from '../hooks/usePriceStream'
+import { useSettings } from '../hooks/useSettings'
+import { formatMoney } from '../services/money'
+import { type CurrencyCode } from '../i18n'
 
 /**
  * 实时价格单元格。
@@ -43,19 +46,24 @@ export interface LiveQuoteProps {
   ticker: string
   /** 流数据缺失时的兜底值（REST 接口返回的静态值） */
   fallback: number | null
-  /** 自定义格式化，默认保留 2 位小数 */
+  /** 数值的币种。模拟器以 USD 为枢纽计价，绝大多数资产传 'USD' 即可；
+   *  切换展示货币时该单元格会按实时汇率重估金额（而非只改符号）。 */
+  from?: CurrencyCode
+  /** 自定义格式化，默认按展示货币换算并带符号格式化 */
   format?: (value: number) => string
 }
 
-export function LivePrice({ ticker, fallback, format }: LiveQuoteProps) {
+export function LivePrice({ ticker, fallback, from = 'USD', format }: LiveQuoteProps) {
   const quote = usePriceQuote(ticker)
   const value = quote ? quote.price : fallback
   const flash = useFlashOnChange(value)
+  // 订阅展示货币变化：切换货币时所有 LivePrice 重渲染并按汇率重估金额
+  useSettings()
 
   if (value === null || !Number.isFinite(value)) return <span>--</span>
   return (
     <span key={flashKey(flash)} className={flashClass(flash)}>
-      {format ? format(value) : value.toFixed(2)}
+      {format ? format(value) : formatMoney(value, from)}
     </span>
   )
 }
