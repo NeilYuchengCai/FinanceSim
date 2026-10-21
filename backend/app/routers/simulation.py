@@ -41,9 +41,14 @@ async def get_sim_clock(world_id: int, session: AsyncSession) -> SimulationClock
 
     # 把"模拟是否暂停"接入行情流：暂停时实时价格冻结（只发心跳，不推进行情）。
     # 读取的是 clock 的实时 is_paused，因此 start/pause/reset 无需各自回推。
+    # 同时把行情波动缩放对齐到当前倍速（X1=实时、X1000=1000×…），
+    # 使行情波动始终等价于真实流逝的模拟秒数，达成全真模拟。
     try:
         stream = get_market_stream()
         stream.set_pause_provider(lambda: sim_clocks[world_id].is_paused)
+        stream.set_sim_seconds_per_tick(
+            SimulationClock.SIM_SECONDS_PER_TICK.get(sim_clocks[world_id].speed, 1)
+        )
     except Exception as exc:  # pragma: no cover - 防御性兜底
         logger.warning("Failed to wire pause provider to market stream: %s", exc)
 
@@ -121,6 +126,16 @@ async def set_speed(world_id: int, speed: str, session: AsyncSession = Depends(g
 
     clock = await get_sim_clock(world_id, session)
     clock.set_speed(sim_speed)
+    # 同步行情波动缩放：让价格的"每秒波动"与倍速匹配，实现全真模拟
+    # （倍速只改时间流速，不改变波动真实性）。
+    try:
+        stream = get_market_stream()
+        if stream is not None:
+            stream.set_sim_seconds_per_tick(
+                SimulationClock.SIM_SECONDS_PER_TICK.get(sim_speed, 1)
+            )
+    except Exception as exc:  # pragma: no cover - 防御性兜底
+        logger.warning("Failed to sync market stream speed scaling: %s", exc)
     return {"speed": speed}
 
 
@@ -160,11 +175,22 @@ async def step(world_id: int, days: int = 1, session: AsyncSession = Depends(get
     await persist_day(world_id, new_day, session)
 
     stream = get_market_stream()
+    # 快进不经过实时 tick 循环，这里手动推进若干 tick 让价格真实演化。
+    # 把"每 tick 模拟秒数"临时设为 173：500 次 advance 的方差累计 ≈ 1 个自然日
+    # （86400 模拟秒）的真实波动（500 × 173 ≈ 86500 ≈ 86400），因此每快进 1 天，
+    # 价格就真实演化约 1 个自然日，与倍速无关的口径一致。
+    prev_sim_sec = None
+    if stream is not None:
+        try:
+            prev_sim_sec = stream.get_sim_seconds_per_tick()
+            stream.set_sim_seconds_per_tick(173)
+        except Exception:
+            prev_sim_sec = None
+
     for d in range(old_day + 1, new_day + 1):
         try:
             day_date = (clock.start_time + timedelta(days=d)).date()
             day_dt = datetime.combine(day_date, datetime.min.time())
-            # 快进不经过实时 tick 循环，这里手动推进若干 tick 让价格真实演化
             if stream is not None:
                 for _ in range(500):
                     try:
@@ -174,6 +200,13 @@ async def step(world_id: int, days: int = 1, session: AsyncSession = Depends(get
             await _run_daily_generators(world_id, session, d, day_dt)
         except Exception as e:
             logger.error(f"Daily updates for step day {d} failed: {e}")
+
+    # 还原快进前的倍速缩放，避免影响后续实时行情推进
+    if stream is not None and prev_sim_sec is not None:
+        try:
+            stream.set_sim_seconds_per_tick(prev_sim_sec)
+        except Exception:
+            pass
 
     return {"current_day": new_day}
 

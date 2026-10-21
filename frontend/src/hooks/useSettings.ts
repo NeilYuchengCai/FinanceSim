@@ -24,7 +24,7 @@ export interface AppSettings {
 
 const DEFAULT_SETTINGS: AppSettings = {
   currency: 'USD',
-  defaultSpeed: 'X10',
+  defaultSpeed: 'X100',
   dataSource: 'fallback',
 }
 

@@ -30,16 +30,23 @@ class SimulationSpeed(Enum):
 class SimulationClock:
     """模拟时钟"""
 
-    # 每次 tick 固定推进的模拟秒数。
-    # 旧实现按"真实 elapsed × 速度倍率"积分，X1 下要 86400 次 tick 才跨天，
-    # 导致跨天逻辑（bot 交易、事件、新闻、日K、宏观推进）被饿死。
-    # 这里改为固定步进：X1 = 1 小时/ tick，约 24 次 tick 跨天；
-    # X100 = 1 天/ tick，1 次即跨天；X1000 = 2 天/ tick。
+    # 每次 /tick 固定推进的「模拟秒数」== 倍速档位本身：
+    #   X1    = 1    模拟秒 / tick  → 1 真实秒 = 1 模拟秒（实时，最低倍速）
+    #   X10   = 10   模拟秒 / tick  → 10×
+    #   X100  = 100  模拟秒 / tick  → 100×
+    #   X1000 = 1000 模拟秒 / tick  → 1000×（最高倍速，仍可继续往上加档）
+    #
+    # 前端每秒调用一次 /tick，因此「每秒真实时间推进的模拟秒数」恰好等于该档位：
+    # 倍速含义直观且与现实贴合 —— X1 即真实时间，越往上调时间流逝越快。
+    #
+    # 行情波动与倍速解耦（见 market_stream.MarketStream.set_sim_seconds_per_tick）：
+    # 每 tick 的价格波动按 sqrt(本 tick 模拟秒数) 缩放，保证任意倍速下波动都真实，
+    # 实现「与现实完全贴合」的全真模拟，而非越快越失真。
     SIM_SECONDS_PER_TICK = {
-        SimulationSpeed.X1: 3600,
-        SimulationSpeed.X10: 21600,
-        SimulationSpeed.X100: 86400,
-        SimulationSpeed.X1000: 172800,
+        SimulationSpeed.X1: 1,
+        SimulationSpeed.X10: 10,
+        SimulationSpeed.X100: 100,
+        SimulationSpeed.X1000: 1000,
     }
 
     def __init__(self, start_time: datetime = None, current_day: int = 0):

@@ -6,8 +6,9 @@ FinanceSim 实时行情流服务
 
 设计要点：
 1. 启动时从 assets 表加载 ticker / current_price / volatility，之后全部在内存演化。
-2. 每 tick 的波动率 = 年化波动率 / sqrt(252) / sqrt(每交易日 tick 数) * TICK_VOL_SCALE，
-   量级远小于日线，价格不会几秒内翻倍或归零。
+2. 每模拟秒的波动率 = 年化波动率 / sqrt(一年秒数) * TICK_VOL_SCALE（GBM 严格时间缩放）；
+   advance() 再按本 tick 覆盖的模拟秒数做 sqrt 缩放，使任意倍速下价格波动都真实，
+   不会几秒内翻倍或归零，也不会因倍速加快而失真。
 3. 叠加极弱的 OU 均值回复，长期运行也不会跑飞。
 4. 非交易日不波动（依赖 trading_calendar，未就绪时降级为"始终交易"）。
 5. 数据库只按固定间隔批量回写 current_price，不做每秒写入。
@@ -42,12 +43,17 @@ except ImportError:  # pragma: no cover - 依赖未就绪时的降级分支
 # ---------------------------------------------------------------- 仿真参数
 TRADING_DAYS_PER_YEAR = 252
 
-# 一个模拟交易日压缩成多少个 tick（tick 间隔默认 1 秒）
-TICKS_PER_TRADING_DAY = 3600
-# 每秒波动相对"日波动 / sqrt(每交易日 tick 数)"的放大系数。
-# 2.0 时：年化波动 25% 的股票每秒 σ≈0.05%，178 美元的股票每秒跳动约 9 分钱，
-# 一小时累计波动约 3%，肉眼可见但不夸张。
-TICK_VOL_SCALE = 2.0
+# 一年有多少秒（按 365.25 天计）。用于把"年化波动率"严格折算成"每秒波动率"：
+#   σ_per_sec = 年化波动率 / sqrt(SECONDS_PER_YEAR)
+# 这是几何布朗运动(GBM)的时间缩放律：任意时长 Δt(秒) 的价格标准差 = σ_per_sec * sqrt(Δt)。
+# 因此无论模拟以何种倍速推进，价格波动都严格等价于"真实流逝的模拟秒数"——
+# 倍速只改变时间流速，不改变波动的真实性，实现与现实完全贴合的全真模拟。
+SECONDS_PER_YEAR = 365.25 * 24 * 3600
+
+# 每秒波动相对"严格年化折算"的放大系数（整体调校旋钮）。
+# 设为 1.0 即纯 GBM 真实波动；如需更快看到价格活动可上调（如 1.5~2.0），
+# 但会偏离真实波动率，故默认保持 1.0 以求全真。
+TICK_VOL_SCALE = 1.0
 # 均值回复强度（OU 过程），保证长期运行价格围绕启动价波动而不是单边跑飞
 MEAN_REVERSION = 0.00005
 # 单个 tick 允许的最大相对变动，兜底防止极端随机数造成跳变
@@ -170,6 +176,9 @@ class MarketStream:
         # 模拟暂停回调：由 routers/simulation 注入，返回当前 world 的
         # SimulationClock.is_paused。返回 True 时本循环冻结价格演进（只发心跳）。
         self._paused_provider: Optional[Callable[[], bool]] = None
+        # 当前每 tick 覆盖的模拟秒数（来自 SimulationClock 的倍速档位）。
+        # 默认 1.0（实时）；行情波动按 sqrt(本值) 缩放，使任意倍速下波动都真实。
+        self._sim_seconds_per_tick: float = 1.0
 
     # ------------------------------------------------------------ 生命周期
     async def start(self) -> None:
@@ -209,6 +218,25 @@ class MarketStream:
         """
         self._paused_provider = provider
 
+    # ------------------------------------------------------------ 倍速联动
+    def set_sim_seconds_per_tick(self, sim_seconds: float) -> None:
+        """告诉行情流当前每 tick 推进多少模拟秒（由 SimulationClock 的倍速档位驱动）。
+
+        行情波动按 sqrt(模拟秒数) 缩放：本 tick 覆盖 S 模拟秒时，
+        标准差 = σ_per_sec * sqrt(S)，严格等价于"真实流逝 S 秒"的 GBM 演化。
+        这样倍速只改变时间流速而不改变波动真实性 —— 任意倍速下都是全真模拟。
+        默认 1.0（实时）。传入非法值退化为 1.0，保证行情流不崩。
+        """
+        try:
+            value = float(sim_seconds)
+            self._sim_seconds_per_tick = value if value > 0 else 1.0
+        except (TypeError, ValueError):
+            self._sim_seconds_per_tick = 1.0
+
+    def get_sim_seconds_per_tick(self) -> float:
+        """读取当前每 tick 模拟秒数（供 /step 快进前暂存、结束后还原）。"""
+        return self._sim_seconds_per_tick
+
     # ------------------------------------------------------------ 加载
     async def load(self) -> None:
         async with async_session_factory() as session:
@@ -243,9 +271,9 @@ class MarketStream:
                 vol = DEFAULT_VOLATILITY.get(asset_type, 0.2)
             vol = min(max(vol, VOL_FLOOR), VOL_CAP)
 
-            # 每 tick 的波动率：日波动 / sqrt(每交易日 tick 数) * 放大系数
-            sigma = vol / math.sqrt(TRADING_DAYS_PER_YEAR) \
-                / math.sqrt(TICKS_PER_TRADING_DAY) * TICK_VOL_SCALE
+            # 每模拟秒的波动率：年化波动率 / sqrt(一年秒数)，再乘放大系数。
+            # advance() 会再按本 tick 覆盖的模拟秒数做 sqrt 缩放，保证任意倍速都真实。
+            sigma = vol / math.sqrt(SECONDS_PER_YEAR) * TICK_VOL_SCALE
 
             prev_close = prev_closes.get(int(asset_id))
             if prev_close is None or prev_close <= 0:
@@ -339,8 +367,7 @@ class MarketStream:
         if vol <= 0:
             vol = DEFAULT_VOLATILITY.get(asset_type, 0.2)
         vol = min(max(vol, VOL_FLOOR), VOL_CAP)
-        sigma = vol / math.sqrt(TRADING_DAYS_PER_YEAR) \
-            / math.sqrt(TICKS_PER_TRADING_DAY) * TICK_VOL_SCALE
+        sigma = vol / math.sqrt(SECONDS_PER_YEAR) * TICK_VOL_SCALE
         self._assets[ticker] = _AssetState(
             asset_id=asset_id,
             ticker=ticker,
@@ -455,11 +482,17 @@ class MarketStream:
             return []
         vol_scale = 1.0 if trading else OFF_SESSION_VOL_SCALE
 
+        # 本 tick 覆盖的模拟秒数（由倍速档位决定）。每模拟秒波动率为 state.sigma，
+        # 多秒累计的方差线性叠加，故标准差按 sqrt(模拟秒数) 缩放 —— GBM 严格正确。
+        # 均值回复是"单位时间的力"，按模拟秒数线性缩放，保证回复速率与倍速无关。
+        sim_sec = self._sim_seconds_per_tick if self._sim_seconds_per_tick > 0 else 1.0
+        sec_factor = math.sqrt(sim_sec)
+
         items: List[dict] = []
         for state in self._assets.values():
             # 几何布朗运动 + 极弱均值回复
-            sigma = state.sigma * vol_scale
-            pull = -MEAN_REVERSION * math.log(state.price / state.anchor)
+            sigma = state.sigma * sec_factor * vol_scale
+            pull = -MEAN_REVERSION * sim_sec * math.log(state.price / state.anchor)
             move = pull + sigma * self._rng.gauss(0.0, 1.0) - 0.5 * sigma ** 2
             move = max(-MAX_TICK_MOVE, min(MAX_TICK_MOVE, move))
 

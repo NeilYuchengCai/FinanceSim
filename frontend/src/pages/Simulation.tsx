@@ -23,12 +23,14 @@ function loadDefaultSpeed(): Speed {
   }
 }
 
-// 倍率越高，tick 越密，避免高速下天数跳变过慢
+// 前端每秒调用一次 /tick；后端每 /tick 推进「档位」个模拟秒，
+// 因此「每秒真实时间推进的模拟秒数」恰好等于倍速档位（X1=实时、X1000=1000×）。
+// 各档位统一 1000ms 轮询，使 sim-秒/真实-秒 == 倍速，倍速含义严格成立、波动随之全真。
 const TICK_INTERVAL: Record<Speed, number> = {
   X1: 1000,
   X10: 1000,
-  X100: 500,
-  X1000: 300,
+  X100: 1000,
+  X1000: 1000,
 }
 
 interface SimStatus {

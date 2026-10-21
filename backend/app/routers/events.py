@@ -16,9 +16,8 @@ from app.schemas import EventCreate, NewsResponse
 from app.engines.event_engine import EventGenerator, EventPropagation, Event as SimEvent
 from app.services.market_stream import (
     get_market_stream,
-    TICKS_PER_TRADING_DAY,
+    SECONDS_PER_YEAR,
     TICK_VOL_SCALE,
-    TRADING_DAYS_PER_YEAR as _MS_TRADING_DAYS,
 )
 
 logger = logging.getLogger(__name__)
@@ -35,8 +34,10 @@ MAX_EVENT_SHOCK_PCT = 0.05
 # propagate 输出的 impact（severity*sentiment 量级 ±1）到价格冲击的基础换算系数
 IMPACT_TO_PRICE = 0.12
 # 波动率差异化：以年化 25% 的普通股票为基准 1.0，缩放范围 [0.5, 2.0]
+# 注意：此处与 market_stream 的 state.sigma 采用同一"每模拟秒年化折算"口径，
+# 因此 vol_ratio = 资产波动率 / 0.25，与倍速无关、跨速度一致。
 _REFERENCE_SIGMA = (
-    0.25 / math.sqrt(_MS_TRADING_DAYS) / math.sqrt(TICKS_PER_TRADING_DAY) * TICK_VOL_SCALE
+    0.25 / math.sqrt(SECONDS_PER_YEAR) * TICK_VOL_SCALE
 )
 VOL_SCALE_RANGE = (0.5, 2.0)
 # 事件类型差异化：危机类冲击最大，宏观类居中，公司类最温和
