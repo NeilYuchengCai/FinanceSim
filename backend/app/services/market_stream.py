@@ -606,9 +606,9 @@ class MarketStream:
             )
             await session.execute(
                 sa_text(
-                    "INSERT INTO price_history "
-                    "(asset_id, timestamp, open, high, low, close, volume, world_day, data_source) "
-                    "VALUES (:asset_id, :timestamp, :open, :high, :low, :close, :volume, :world_day, 'SIMULATED')"
+                "INSERT INTO price_history "
+                "(asset_id, timestamp, open, high, low, close, volume, world_day, data_source) "
+                f"VALUES (:asset_id, :timestamp, :open, :high, :low, :close, :volume, :world_day, '{DataSource.SIMULATED.value}')"
                 ),
                 bar_rows,
             )

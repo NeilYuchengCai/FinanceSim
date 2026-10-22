@@ -57,10 +57,52 @@ class SafeDict(dict):
     """模板格式化用的安全字典。
 
     新闻模板的占位符远多于调用方显式传入的参数，缺失的 key 会通过
-    NewsGenerator._default_for 生成合理随机值，避免 KeyError。
+    ``_default_for`` 生成合理随机值（统一走引擎的可复现随机源），避免 KeyError。
     """
+
+    def __init__(self, mapping, rng):
+        super().__init__(mapping)
+        self._rng = rng
+
     def __missing__(self, key):
-        return NewsGenerator._default_for(key)
+        return self._default_for(key)
+
+    def _default_for(self, key: str):
+        """为模板中缺失的占位符生成合理的随机默认值（统一走 self._rng，铁律⑤）。"""
+        rng = self._rng
+        mapping = {
+            "company": lambda: rng.choice(NewsGenerator.COMPANIES),
+            "company1": lambda: rng.choice(NewsGenerator.COMPANIES),
+            "company2": lambda: rng.choice([c for c in NewsGenerator.COMPANIES if True]),
+            "sector": lambda: rng.choice(NewsGenerator.SECTORS),
+            "eps": lambda: round(rng.random() * 3.5 + 0.5, 2),
+            "expected": lambda: round(rng.random() * 3.5 + 0.5, 2),
+            "pct": lambda: round(rng.random() * 12 + 0.5, 1),
+            "quarter": lambda: rng.randint(1, 4),
+            "bp": lambda: rng.choice([25, 50, 75]),
+            "rate": lambda: round(rng.random() * 4.5 + 0.5, 2),
+            "n": lambda: rng.randint(50, 350) * 1000,
+            "month": lambda: rng.choice(NewsGenerator.MONTHS),
+            "direction": lambda: rng.choice(["rose", "fell", "climbed", "eased"]),
+            "action": lambda: rng.choice(["raises", "cuts", "reviewed", "holds"]),
+            "outlook": lambda: rng.choice(["a dovish tone", "a hawkish tone", "policy patience", "caution on growth"]),
+            "significance": lambda: rng.choice(["notable", "moderate", "elevated"]),
+            "condition": lambda: rng.choice(["resilient", "tight", "subdued", "robust"]),
+            "result": lambda: rng.choice(["beating", "matching", "missing"]),
+            "value": lambda: round(rng.random() * 45 + 1.5, 1),
+            "product": lambda: rng.choice(NewsGenerator.PRODUCTS),
+            "market": lambda: rng.choice(["enterprise", "consumer", "mid-tier", "international"]),
+            "issue": lambda: rng.choice(NewsGenerator.ISSUES),
+            "impact": lambda: rng.choice(["valuation", "compliance costs", "near-term margins", "market access"]),
+            "name": lambda: rng.choice(NewsGenerator.NAMES),
+            "date": lambda: "next quarter",
+            "tenure": lambda: rng.randint(3, 15),
+            "concern": lambda: rng.choice(["refinancing", "margin compression", "cyclical demand"]),
+            "agency": lambda: rng.choice(NewsGenerator.AGENCIES),
+            "rating": lambda: rng.choice(["AAA", "AA", "A", "BBB"]),
+        }
+        gen = mapping.get(key)
+        return gen() if gen else "N/A"
 
 
 def _fmt_price(p: float) -> str:
@@ -175,50 +217,18 @@ class NewsGenerator:
     NAMES = ["a veteran industry executive", "the former chief operating officer", "an external hire from a rival firm", "the company president"]
     ISSUES = ["supply chain disruptions", "a trade policy dispute", "data privacy compliance", "pricing practices", "export controls", "an ongoing antitrust review"]
     
-    def __init__(self):
+    def __init__(self, seed: Optional[int] = None, world_id: Optional[int] = None):
         self.news_items: List[NewsItem] = []
         self._news_id_counter = 0
+        # 实例级可复现随机源：同一 seed + world 下新闻序列可复现（铁律⑤）
+        self._seed = seed
+        self._world_id = world_id
+        self._rng = random.Random(seed)
     
     @staticmethod
     def _default_for(key: str):
-        """为模板中缺失的占位符生成合理的随机默认值。
-        模板本身远多于调用方显式提供的参数，因此这里做兜底，避免 KeyError。"""
-        r = random.random
-        mapping = {
-            "company": lambda: random.choice(NewsGenerator.COMPANIES),
-            "company1": lambda: random.choice(NewsGenerator.COMPANIES),
-            "company2": lambda: random.choice(
-                [c for c in NewsGenerator.COMPANIES if True]
-            ),
-            "sector": lambda: random.choice(NewsGenerator.SECTORS),
-            "eps": lambda: round(r() * 3.5 + 0.5, 2),
-            "expected": lambda: round(r() * 3.5 + 0.5, 2),
-            "pct": lambda: round(r() * 12 + 0.5, 1),
-            "quarter": lambda: random.randint(1, 4),
-            "bp": lambda: random.choice([25, 50, 75]),
-            "rate": lambda: round(r() * 4.5 + 0.5, 2),
-            "n": lambda: random.randint(50, 350) * 1000,
-            "month": lambda: random.choice(NewsGenerator.MONTHS),
-            "direction": lambda: random.choice(["rose", "fell", "climbed", "eased"]),
-            "action": lambda: random.choice(["raises", "cuts", "reviewed", "holds"]),
-            "outlook": lambda: random.choice(["a dovish tone", "a hawkish tone", "policy patience", "caution on growth"]),
-            "significance": lambda: random.choice(["notable", "moderate", "elevated"]),
-            "condition": lambda: random.choice(["resilient", "tight", "subdued", "robust"]),
-            "result": lambda: random.choice(["beating", "matching", "missing"]),
-            "value": lambda: round(r() * 45 + 1.5, 1),
-            "product": lambda: random.choice(NewsGenerator.PRODUCTS),
-            "market": lambda: random.choice(["enterprise", "consumer", "mid-tier", "international"]),
-            "issue": lambda: random.choice(NewsGenerator.ISSUES),
-            "impact": lambda: random.choice(["valuation", "compliance costs", "near-term margins", "market access"]),
-            "name": lambda: random.choice(NewsGenerator.NAMES),
-            "date": lambda: "next quarter",
-            "tenure": lambda: random.randint(3, 15),
-            "concern": lambda: random.choice(["refinancing", "margin compression", "cyclical demand"]),
-            "agency": lambda: random.choice(NewsGenerator.AGENCIES),
-            "rating": lambda: random.choice(["AAA", "AA", "A", "BBB"]),
-        }
-        gen = mapping.get(key)
-        return gen() if gen else "N/A"
+        # 历史兼容占位：模板随机默认值已迁移至 SafeDict._default_for（统一走可复现随机源）。
+        return "N/A"
     
     def generate_news(self, assets: List[Dict], macro_state: Optional[Dict] = None, min_count: int = 10) -> List[NewsItem]:
         """生成新闻
@@ -259,8 +269,10 @@ class NewsGenerator:
         """
         if target_date is None:
             target_date = datetime.now()
-        # 用模拟日的序数做随机种子：同一天新闻可复现，不同天天然不同（避免随机模版 spam）
-        rng = random.Random(target_date.toordinal())
+        # 用（引擎种子 + 世界 + 模拟日）派生可复现随机源：同一 world+天新闻可复现，
+        # 不同天/不同世界天然不同（铁律⑤）。统一走 self._rng 以保证与全站一致。
+        self._rng.seed((self._seed or 0) ^ (self._world_id or 0) ^ int(target_date.toordinal()))
+        rng = self._rng
 
         news: List[NewsItem] = []
         equities = [s for s in (snapshot or []) if s.get("y") in ("EQUITY", "ETF")]
@@ -501,7 +513,7 @@ class NewsGenerator:
         if not movers:
             return out
         if rng is None:
-            rng = random
+            rng = self._rng
         # 按模拟日种子挑选"主角"，使快进的每一天聚焦不同真实个股，而非千篇一律
         top = rng.choice(movers)
         name = top.get("n") or top.get("t")
@@ -630,15 +642,15 @@ class NewsGenerator:
         news = []
         
         for asset in assets:
-            # 随机生成事件
-            if random.random() < 0.3:  # 30%概率生成新闻
-                event_type = random.choice([
+            # 随机生成事件（统一走 self._rng，铁律⑤）
+            if self._rng.random() < 0.3:  # 30%概率生成新闻
+                event_type = self._rng.choice([
                     "earnings_beat", "earnings_miss", "product_launch",
                     "merger_acquisition", "regulatory_action", "management_change",
                     "geopolitical", "credit_event"
                 ])
                 
-                sentiment = random.uniform(-0.5, 0.5)
+                sentiment = self._rng.uniform(-0.5, 0.5)
                 importance = NewsImportance.MAJOR if abs(sentiment) > 0.3 else NewsImportance.COMPANY
                 ticker = asset.get("ticker", "Company")
                 sector = asset.get("sector", "Technology")
@@ -654,7 +666,7 @@ class NewsGenerator:
                     others = [a.get("ticker") for a in assets if a.get("ticker") and a.get("ticker") != ticker]
                     pool = others or [c for c in self.COMPANIES if c != ticker]
                     kwargs["company1"] = ticker
-                    kwargs["company2"] = random.choice(pool) if pool else random.choice(self.COMPANIES)
+                    kwargs["company2"] = self._rng.choice(pool) if pool else self._rng.choice(self.COMPANIES)
                 else:
                     kwargs["company"] = ticker
                 
@@ -685,7 +697,7 @@ class NewsGenerator:
         try:
             # 必须用 format_map：str.format(d) 会把 dict 当成位置参数传给 {0}，
             # 占位符 {company} 等反而找不到值，__missing__ 也不会被触发。
-            headline = random.choice(templates).format_map(SafeDict(kwargs))
+            headline = self._rng.choice(templates).format_map(SafeDict(kwargs, self._rng))
         except Exception as e:  # 兜底：任何格式化异常都不应让请求失败
             logger.warning(f"News template '{template_type}' render failed: {e}")
             company = kwargs.get("company", "the company")
@@ -878,8 +890,10 @@ class NewsGenerator:
 class NewsEngine:
     """新闻引擎 - 主入口"""
     
-    def __init__(self):
-        self.generator = NewsGenerator()
+    def __init__(self, seed: Optional[int] = None, world_id: Optional[int] = None):
+        self._seed = seed
+        self._world_id = world_id
+        self.generator = NewsGenerator(seed=seed, world_id=world_id)
         self.archived_news: List[NewsItem] = []
     
     def ensure_populated(self, assets: Optional[List[Dict]] = None, macro_state: Optional[Dict] = None) -> None:

@@ -9,6 +9,8 @@ from typing import Dict, List, Optional
 from dataclasses import dataclass, field
 from datetime import datetime
 
+from app.core.datasource import DataSource, normalize_data_source
+
 logger = logging.getLogger(__name__)
 
 
@@ -48,7 +50,7 @@ class CurrencyPair:
             "high_24h": round(self.day_high, 5),
             "low_24h": round(self.day_low, 5),
             # 数据来源标注：汇率全部为模拟引擎生成
-            "data_source": "SIMULATED",
+            "data_source": DataSource.SIMULATED.value,
         }
 
     def _calculate_change(self) -> float:
@@ -57,11 +59,15 @@ class CurrencyPair:
             return (self.price - self.day_open) / self.day_open
         return 0.0
 
-    def update(self, volatility_mult: float = 1.0) -> Dict:
-        """更新价格"""
+    def update(self, volatility_mult: float = 1.0, rng: "random.Random" = None) -> Dict:
+        """更新价格。
+
+        rng 由调用方（FXEngine）传入可复现随机源；缺省退化为全局 random（兼容旧调用）。
+        """
         old_price = self.price
-        # 基于波动率的价格变动
-        change = random.gauss(0, self.volatility * volatility_mult)
+        # 基于波动率的价格变动（使用传入的可复现随机源，铁律⑤）
+        rng = rng or random
+        change = rng.gauss(0, self.volatility * volatility_mult)
         self.price = max(0.001, self.price * (1 + change))
         self.last_update = datetime.now()
         # 维护当日高低点（必须包含当前价）
@@ -134,12 +140,16 @@ class FXEngine:
             }
         return pairs or dict(FXEngine.DEFAULT_PAIRS)
 
-    def __init__(self):
+    def __init__(self, seed: Optional[int] = None, world_id: Optional[int] = None):
         self.pairs: Dict[str, CurrencyPair] = {}
         self._pair_configs = self._load_seed_pairs()
         self.price_history: Dict[str, List[Dict]] = {t: [] for t in self._pair_configs}
+        # 实例级可复现随机源：同一 seed 下外汇演化序列可复现（铁律⑤）
+        self._seed = seed
+        self._world_id = world_id
+        self._rng = random.Random(seed)
         self._init_pairs()
-        logger.info(f"FXEngine initialized with {len(self.pairs)} pairs")
+        logger.info("FXEngine initialized with %d pairs (seed=%s)", len(self.pairs), seed)
 
     def _init_pairs(self):
         """初始化货币对"""
@@ -159,7 +169,7 @@ class FXEngine:
         """
         results = {}
         for ticker, pair in self.pairs.items():
-            update_result = pair.update(volatility_mult)
+            update_result = pair.update(volatility_mult, self._rng)
             results[ticker] = update_result
             
             # 记录历史
@@ -272,13 +282,13 @@ class FXEngine:
         
         results = {}
         for ticker, pair in self.pairs.items():
-            # 特定冲击对特定货币对的影响
+            # 特定冲击对特定货币对的影响（统一走 self._rng，铁律⑤）
             if shock_type == "central_bank" and "USD" in ticker:
-                impact = random.gauss(0, multiplier * 2)
+                impact = self._rng.gauss(0, multiplier * 2)
             elif shock_type == "trade_war" and "EUR" in ticker:
-                impact = random.gauss(-multiplier, multiplier)
+                impact = self._rng.gauss(-multiplier, multiplier)
             else:
-                impact = random.gauss(0, multiplier)
+                impact = self._rng.gauss(0, multiplier)
             
             old_price = pair.price
             pair.price = max(0.001, pair.price * (1 + impact))
@@ -291,5 +301,137 @@ class FXEngine:
                 "new_price": round(pair.price, 5)
             }
         
-        logger.info(f"Applied shock {shock_type} with magnitude {magnitude}")
+        logger.info("Applied shock %s with magnitude %s", shock_type, magnitude)
         return results
+
+    async def restore_prices(self) -> None:
+        """重启恢复：从 assets 表读取 FX 资产的最新价（此前由行情流 / 上轮落库写入），
+
+        覆盖 fx_pairs.json 的静态种子价，使 FXEngine 重启后从演化后的价格继续，
+        而不是退回静态种子价（铁律③ Offline-First）。同时把最近的价格历史回灌到
+        内存 price_history，使 /fx/pair/{ticker}/history 重启后也有数据。
+        """
+        try:
+            from app.database import async_session_factory
+            from app.models import Asset, PriceHistory
+            from sqlalchemy import select
+
+            async with async_session_factory() as session:
+                rows = (
+                    await session.execute(
+                        select(Asset.id, Asset.ticker, Asset.current_price)
+                        .where(Asset.type == "FX")
+                    )
+                ).all()
+                id_map = {t: (aid, cp) for aid, t, cp in rows}
+
+                for ticker, pair in self.pairs.items():
+                    rec = id_map.get(ticker)
+                    if not rec:
+                        continue
+                    aid, cp = rec
+                    if cp is not None and cp > 0:
+                        pair.price = float(cp)
+                        pair.day_open = pair.price
+                        pair.day_high = pair.price
+                        pair.day_low = pair.price
+                        pair.last_update = datetime.now()
+                    # 回灌最近 200 根 K 线到内存（重启后历史可见）
+                    hist = (
+                        await session.execute(
+                            select(PriceHistory)
+                            .where(PriceHistory.asset_id == aid)
+                            .order_by(PriceHistory.timestamp.desc())
+                            .limit(200)
+                        )
+                    ).scalars().all()
+                    bars = list(reversed(list(hist)))  # 升序
+                    self.price_history[ticker] = [
+                        {
+                            "timestamp": (h.timestamp.isoformat() if h.timestamp else None),
+                            "open": h.open,
+                            "high": h.high,
+                            "low": h.low,
+                            "close": h.close,
+                            "volume": h.volume,
+                        }
+                        for h in bars
+                    ]
+                    # 优先用 FXEngine 自己落库的最新 bar 收盘价恢复价格（可复现、不受
+                    # 行情流独立演化影响）；无 bar 时退回 assets.current_price（行情流上轮
+                    # 落库值），再退回种子默认价。
+                    if bars:
+                        pair.price = float(bars[-1].close)
+                    elif cp is not None and cp > 0:
+                        pair.price = float(cp)
+                    pair.day_open = pair.price
+                    pair.day_high = pair.price
+                    pair.day_low = pair.price
+                    pair.last_update = datetime.now()
+            logger.info("FXEngine restored prices/history from assets table")
+        except Exception as exc:  # 防御性兜底：恢复失败时退回种子默认价
+            logger.warning("FXEngine restore_prices failed, using seed defaults: %s", exc)
+
+    async def persist_prices(self) -> None:
+        """把外汇价格演化结果落库（与 MarketStream 对齐的单一真相源）。
+
+        写两处：
+        1) assets.current_price —— 重启恢复的主路径（restore_prices 读这里）；
+        2) price_history —— 统一价格历史，使 /fx/pair/{ticker}/history 有连续记录。
+        金额统一用 Decimal 规整后再落 Float 列，避免浮点误差累积。
+        """
+        try:
+            from app.database import async_session_factory
+            from app.models import Asset, PriceHistory
+            from sqlalchemy import select, text
+
+            async with async_session_factory() as session:
+                rows = (
+                    await session.execute(
+                        select(Asset.id, Asset.ticker).where(Asset.type == "FX")
+                    )
+                ).all()
+                id_map = {t: aid for aid, t in rows}
+
+                ts = datetime.now()
+                price_payload = []
+                hist_payload = []
+                for ticker, pair in self.pairs.items():
+                    aid = id_map.get(ticker)
+                    if aid is None:
+                        continue
+                    close = float(Decimal(str(round(pair.price, 5))))
+                    day_open = float(Decimal(str(round(pair.day_open or pair.price, 5))))
+                    day_high = float(Decimal(str(round(pair.day_high or pair.price, 5))))
+                    day_low = float(Decimal(str(round(pair.day_low or pair.price, 5))))
+                    price_payload.append({"aid": int(aid), "price": close})
+                    hist_payload.append({
+                        "asset_id": int(aid),
+                        "timestamp": ts,
+                        "open": day_open,
+                        "high": day_high,
+                        "low": day_low,
+                        "close": close,
+                        "volume": 0,
+                        "world_day": None,
+                        "data_source": normalize_data_source(DataSource.SIMULATED.value),
+                    })
+
+                if price_payload:
+                    await session.execute(
+                        text("UPDATE assets SET current_price = :price WHERE id = :aid"),
+                        price_payload,
+                    )
+                if hist_payload:
+                    await session.execute(
+                        text(
+                            "INSERT INTO price_history "
+                            "(asset_id, timestamp, open, high, low, close, volume, world_day, data_source) "
+                            "VALUES (:asset_id, :timestamp, :open, :high, :low, :close, :volume, :world_day, :data_source)"
+                        ),
+                        hist_payload,
+                    )
+                await session.commit()
+            logger.info("FXEngine persisted %d pairs to assets/price_history", len(price_payload))
+        except Exception as exc:  # 落库失败不应让价格演化失败
+            logger.warning("FXEngine persist_prices failed: %s", exc)

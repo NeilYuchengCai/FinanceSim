@@ -14,6 +14,7 @@ from app.dependencies import get_world_or_404
 from app.models import Event, News, Asset, World
 from app.schemas import EventCreate, NewsResponse
 from app.engines.event_engine import EventGenerator, EventPropagation, Event as SimEvent
+from app.core.datasource import DataSource
 from app.services.market_stream import (
     get_market_stream,
     SECONDS_PER_YEAR,
@@ -166,7 +167,7 @@ async def list_events(
             "created_at": e.created_at.isoformat(),
             "duration_days": e.duration_days or 0,
             # 数据来源标注：事件为模拟事件引擎生成
-            "data_source": "SIMULATED",
+            "data_source": DataSource.SIMULATED.value,
         }
         for e in events
     ]
@@ -200,7 +201,7 @@ async def get_asset_timeline(
             "title": e.title,
             "affected_assets": e.affected_assets,
             "created_at": e.created_at.isoformat(),
-            "data_source": "SIMULATED",
+            "data_source": DataSource.SIMULATED.value,
         }
         for e in events
     ]

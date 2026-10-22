@@ -11,6 +11,7 @@ from sqlalchemy import select, text
 from app.database import get_session
 from app.models import Asset, PriceHistory
 from app.schemas import AssetCreate, AssetResponse, PriceBar
+from app.core.datasource import DataSource, normalize_data_source
 
 router = APIRouter(prefix="/assets", tags=["assets"])
 
@@ -61,7 +62,8 @@ async def create_asset(
             low=price,
             close=price,
             volume=0,
-            data_source="simulated",
+            # 数据来源标注（铁律④）：统一用受控枚举常量，并在写入处归一化兜底
+            data_source=normalize_data_source(DataSource.SIMULATED.value),
         ))
         await session.commit()
 

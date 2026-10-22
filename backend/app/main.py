@@ -41,9 +41,11 @@ async def lifespan(app: FastAPI):
     logger.info("Database initialized")
 
     # 世界种子 -> 引擎随机源：默认世界（id=1）的 seed 经 crc32 转为整数，
-    # 注入事件/商品/行情流，使同一世界的模拟演化跨重启可复现；
+    # 并叠加"引擎名"派生各引擎独立 seed，使同一世界的各引擎各自可复现、
+    # 且不同世界（不同 seed/不同 id）天然互相独立（铁律⑤）。
     # 取不到世界或 seed 时退化为固定默认值（仍然确定）。
-    sim_seed = 42
+    resolved_world_id = 1
+    base_key = "default"
     try:
         from sqlalchemy import select as _select
         from app.models import World as _World
@@ -52,11 +54,19 @@ async def lifespan(app: FastAPI):
             _world = (await _seed_session.execute(
                 _select(_World).where(_World.id == 1)
             )).scalar_one_or_none()
-            if _world is not None and _world.seed:
-                sim_seed = zlib.crc32(str(_world.seed).encode("utf-8"))
-                logger.info("World seed '%s' -> engine seed %d", _world.seed, sim_seed)
+            if _world is not None:
+                resolved_world_id = _world.id
+                base_key = _world.seed if _world.seed else f"world:{_world.id}"
+                logger.info("Resolved world id=%s seed=%r for engine seeding", resolved_world_id, _world.seed)
     except Exception as e:
-        logger.warning(f"Failed to resolve world seed, using default {sim_seed}: {e}")
+        logger.warning("Failed to resolve world for seeding, using defaults: %s", e)
+
+    def eng_seed(name: str) -> int:
+        """按 '世界 seed/key + 引擎名' 派生独立可复现的随机种子（铁律⑤）。"""
+        import zlib
+        return zlib.crc32(f"{base_key}:{name}".encode("utf-8"))
+
+    sim_seed = eng_seed("global")  # 兼容命名：注入不需要独立 seed 的引擎
 
     # 每个引擎独立 try/except：单个引擎初始化失败只置 None + 记录日志，
     # 服务继续启动（路由层 503 分支接住），不再一损俱损。
@@ -86,7 +96,7 @@ async def lifespan(app: FastAPI):
     # 初始化新闻引擎
     logger.info("Initializing News Engine...")
     try:
-        _news_engine = NewsEngine()
+        _news_engine = NewsEngine(seed=eng_seed("news"), world_id=resolved_world_id)
         news_router.init_news_engine(_news_engine)
         logger.info("News Engine initialized")
     except Exception as e:
@@ -95,8 +105,10 @@ async def lifespan(app: FastAPI):
 
     logger.info("Initializing FX Engine...")
     try:
-        _fx_engine = FXEngine()
+        _fx_engine = FXEngine(seed=eng_seed("fx"), world_id=resolved_world_id)
         fx.init_fx_engine(_fx_engine)
+        # 重启恢复：从 assets 表读回上轮演化后的 FX 价（铁律③ Offline-First）
+        await _fx_engine.restore_prices()
         logger.info("FX Engine initialized")
     except Exception as e:
         _fx_engine = None
@@ -130,7 +142,7 @@ async def lifespan(app: FastAPI):
     # 初始化事件引擎
     logger.info("Initializing Event Engine...")
     try:
-        _event_generator = EventGenerator(1, seed=sim_seed)
+        _event_generator = EventGenerator(resolved_world_id, seed=eng_seed("event"))
         _event_propagation = EventPropagation()
         events.init_event_engine(_event_generator, _event_propagation)
         logger.info("Event Engine initialized")
@@ -142,7 +154,7 @@ async def lifespan(app: FastAPI):
     # 初始化商品引擎
     logger.info("Initializing Commodity Engine...")
     try:
-        _commodity_engine = CommodityEngine(seed=sim_seed)
+        _commodity_engine = CommodityEngine(seed=eng_seed("commodity"))
         commodities.init_commodity_engine(_commodity_engine)
         logger.info("Commodity Engine initialized")
     except Exception as e:
@@ -152,7 +164,7 @@ async def lifespan(app: FastAPI):
     # 启动实时行情流：内存价格每秒小幅游走，供 /api/v1/ws/prices 推送
     logger.info("Starting market price stream...")
     try:
-        await get_market_stream(seed=sim_seed).start()
+        await get_market_stream(seed=eng_seed("market")).start()
         logger.info("Market price stream started")
     except Exception as e:
         logger.exception(f"Market price stream failed to start: {e}")

@@ -87,6 +87,8 @@ async def step_fx(
     results = {}
     for _ in range(days):
         results = engine.step(volatility_mult)
+    # 价格演化后落库（与 MarketStream 对齐），使重启后 FX 价格可恢复（铁律③）
+    await engine.persist_prices()
 
     return results
 
@@ -98,7 +100,10 @@ async def apply_shock(
 ):
     """应用外部冲击"""
     engine = _require_engine()
-    return engine.apply_shock(shock_type, magnitude)
+    result = engine.apply_shock(shock_type, magnitude)
+    # 冲击后同样落库，保证价格可恢复
+    await engine.persist_prices()
+    return result
 
 
 @router.get("/briefing")
