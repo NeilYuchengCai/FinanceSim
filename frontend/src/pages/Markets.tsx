@@ -251,10 +251,10 @@ export default function Markets() {
             const v = data.distribution[key] || 0
             const color =
               key.startsWith('below') || key.startsWith('-5_') || key.startsWith('-2_')
-                ? 'var(--accent-red)'
+                ? 'var(--accent-green)'
                 : key === '-0.5_to_0.5'
                 ? 'var(--text-secondary)'
-                : 'var(--accent-green)'
+                : 'var(--accent-red)'
             return (
               <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
                 <span style={{ width: 90, fontSize: 12, color: 'var(--text-secondary)' }}>{label}</span>

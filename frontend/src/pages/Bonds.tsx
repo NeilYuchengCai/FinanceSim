@@ -194,13 +194,13 @@ export default function Bonds() {
                     const dp = live ? live.price : bond.price
                     const ch = live ? live.changePct : 0
                     return (
-                      <span style={{ color: ch >= 0 ? 'var(--accent-green)' : 'var(--accent-red)', fontFamily: 'monospace' }}>
+                      <span style={{ color: ch >= 0 ? 'var(--accent-red)' : 'var(--accent-green)', fontFamily: 'monospace' }}>
                         {formatMoney(dp, 'USD')}
                       </span>
                     )
                   })()}
                 </td>
-                <td className="positive">{formatYield(bond.yield_to_maturity)}</td>
+                <td>{formatYield(bond.yield_to_maturity)}</td>
                 <td>{bond.duration.toFixed(1)}</td>
                 <td>{formatDate(bond.maturity_date)}</td>
               </tr>

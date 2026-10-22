@@ -97,13 +97,13 @@ export default function FX() {
             <div
               key={pair.ticker}
               className="card"
-              style={{ borderLeft: `3px solid ${displayChange >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'}`, cursor: 'pointer' }}
+              style={{ borderLeft: `3px solid ${displayChange >= 0 ? 'var(--accent-red)' : 'var(--accent-green)'}`, cursor: 'pointer' }}
               onClick={() => navigate(`/asset/${encodeURIComponent(pair.ticker)}`)}
               title={t('assetDetail.viewDetail')}
             >
               <div className="card-header">
                 <span className="card-title">{pair.ticker}</span>
-                <span className={`badge badge-dot ${displayChange >= 0 ? 'green' : 'red'}`}></span>
+                <span className={`badge badge-dot ${displayChange >= 0 ? 'red' : 'green'}`}></span>
               </div>
               <div className="stat-value" style={{ fontFamily: 'monospace' }}>
                 {formatPrice(displayPrice)}

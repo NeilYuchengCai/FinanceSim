@@ -74,7 +74,7 @@ export function LiveChange({ ticker, fallback, format }: LiveQuoteProps) {
   const flash = useFlashOnChange(value)
 
   if (value === null || !Number.isFinite(value)) return <span>--</span>
-  // 项目约定：positive=绿=涨，negative=红=跌
+  // 全站统一：positive(红)=涨，negative(绿)=跌（A 股惯例：红涨绿跌）
   const dir = value >= 0 ? 'positive' : 'negative'
   return (
     <span key={flashKey(flash)} className={`${flashClass(flash)} ${dir}`.trim()}>

@@ -97,7 +97,7 @@ function TopMovers({ assets }: { assets: Asset[] }) {
           <span className="card-title">{t('equities.topGainers')}</span>
         </div>
         <div style={{ padding: 20, textAlign: 'center' }}>
-          <div style={{ fontSize: '2rem', color: 'var(--accent-green)' }}>
+          <div style={{ fontSize: '2rem', color: 'var(--accent-red)' }}>
             {topGainer ? formatChange(topGainer.change) : '--'}
           </div>
           <div style={{ color: 'var(--text-secondary)', marginTop: 8 }}>
@@ -110,7 +110,7 @@ function TopMovers({ assets }: { assets: Asset[] }) {
           <span className="card-title">{t('equities.topLosers')}</span>
         </div>
         <div style={{ padding: 20, textAlign: 'center' }}>
-          <div style={{ fontSize: '2rem', color: 'var(--accent-red)' }}>
+          <div style={{ fontSize: '2rem', color: 'var(--accent-green)' }}>
             {topLoser ? formatChange(topLoser.change) : '--'}
           </div>
           <div style={{ color: 'var(--text-secondary)', marginTop: 8 }}>

@@ -158,7 +158,10 @@ export default function Bots() {
           <div style={{ color: 'var(--text-secondary)', fontSize: 13 }}>{t('bots.activeBots')}</div>
         </div>
         <div className="card">
-          <div className="stat-value" style={{ color: 'var(--accent-green)' }}>
+          <div
+            className="stat-value"
+            style={{ color: bots.reduce((sum, b) => sum + b.total_pnl, 0) >= 0 ? 'var(--accent-red)' : 'var(--accent-green)' }}
+          >
             {bots.reduce((sum, b) => sum + b.total_pnl, 0).toFixed(2)}
           </div>
           <div style={{ color: 'var(--text-secondary)', fontSize: 13 }}>{t('bots.totalPnl')}</div>
@@ -287,7 +290,7 @@ export default function Bots() {
                 </div>
                 <div>
                   <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{t('bots.pnl')}</div>
-                  <div style={{ fontWeight: 600, color: bot.total_pnl >= 0 ? 'var(--accent-green)' : 'var(--accent-red)' }}>
+                  <div style={{ fontWeight: 600, color: bot.total_pnl >= 0 ? 'var(--accent-red)' : 'var(--accent-green)' }}>
                     ${bot.total_pnl.toFixed(2)}
                   </div>
                 </div>

@@ -21,12 +21,16 @@ interface Commodity {
   last_update: string
 }
 
-const CATEGORY_NAMES: Record<string, string> = {
-  ALL: t('commodities.all'),
-  ENERGY: t('commodities.energy'),
-  METAL: t('commodities.metals'),
-  AGRICULTURE: t('commodities.agriculture'),
-  PRECIOUS_METAL: t('commodities.precious'),
+// 分类名称改为在「渲染时」按当前 locale 求值，避免在模块作用域固化导致切换语言后标签不更新。
+function categoryName(cat: string): string {
+  const names: Record<string, string> = {
+    ALL: t('commodities.all'),
+    ENERGY: t('commodities.energy'),
+    METAL: t('commodities.metals'),
+    AGRICULTURE: t('commodities.agriculture'),
+    PRECIOUS_METAL: t('commodities.precious'),
+  }
+  return names[cat] || cat
 }
 
 export default function Commodities() {
@@ -141,7 +145,7 @@ export default function Commodities() {
                 fontSize: 13,
               }}
             >
-              {CATEGORY_NAMES[cat] || cat}
+              {categoryName(cat)}
             </button>
           ))}
         </div>
@@ -150,7 +154,7 @@ export default function Commodities() {
       <div className="card">
         <div className="card-header">
           <span className="card-title">{t('commodities.allCommodities')}</span>
-          <span className="tag tag-blue">LIVE</span>
+          <span className="tag tag-gray">SIM</span>
         </div>
         <table className="data-table">
           <thead>

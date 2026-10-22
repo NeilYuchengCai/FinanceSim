@@ -17,8 +17,8 @@
   --accent-yellow: #d29922;
   --border-color: #30363d;
   /* 实时价格跳动时的高亮底色（涨绿/跌红），约 600ms 后淡出 */
-  --flash-up-bg: rgba(63, 185, 80, 0.35);
-  --flash-down-bg: rgba(248, 81, 73, 0.35);
+  --flash-up-bg: rgba(248, 81, 73, 0.35);
+  --flash-down-bg: rgba(63, 185, 80, 0.35);
 }
 
 [data-theme="light"] {
@@ -32,8 +32,8 @@
   --accent-blue: #0969da;
   --accent-yellow: #9a6700;
   --border-color: #d0d7de;
-  --flash-up-bg: rgba(26, 127, 55, 0.28);
-  --flash-down-bg: rgba(207, 34, 46, 0.28);
+  --flash-up-bg: rgba(207, 34, 46, 0.28);
+  --flash-down-bg: rgba(26, 127, 55, 0.28);
 }
 
 body {
@@ -172,14 +172,18 @@ body {
   font-size: 0.85rem;
 }
 
-.stat-change.positive,
+/* 全站统一涨跌色：红涨绿跌（A 股惯例）。
+   涨 / 盈 = 红，跌 / 亏 = 绿。
+   .positive 与 .cn-up 互为同义别名（红），.negative 与 .cn-down 互为同义别名（绿），
+   仅在此一处集中定义，避免双定义造成语义漂移。 */
+.cn-up,
 .positive {
-  color: var(--accent-green);
+  color: var(--accent-red);
 }
 
-.stat-change.negative,
+.cn-down,
 .negative {
-  color: var(--accent-red);
+  color: var(--accent-green);
 }
 
 /* Tables */
@@ -405,16 +409,7 @@ body {
 .live-status.live-paused { color: var(--accent-amber, #d6a23c); }
 .live-status.live-paused .live-dot { background: var(--accent-amber, #d6a23c); }
 
-/* 中国市场惯例配色：涨红跌绿。
-   注意：.positive/.negative 是欧美配色（涨绿跌红），两者不要混用；
-   涉及「盈亏/涨跌」语义且需要遵循 A 股惯例时使用 .cn-up / .cn-down。 */
-.cn-up {
-  color: var(--accent-red);
-}
-
-.cn-down {
-  color: var(--accent-green);
-}
+/* 涨跌色（红涨绿跌）已在上方 .positive / .negative / .cn-up / .cn-down 处统一集中定义，此处不再重复。 */
 
 /* 全局 Toast（components/Toast.tsx）：右上角，深色主题走 CSS 变量 */
 .toast-container {

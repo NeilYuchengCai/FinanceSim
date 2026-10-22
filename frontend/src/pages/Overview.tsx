@@ -180,7 +180,7 @@ export default function Overview() {
       <div className="card">
         <div className="card-header">
           <span className="card-title">{t('overview.breakingNews')}</span>
-          <span className="tag tag-red">LIVE</span>
+          <span className="tag tag-gray">SIM</span>
         </div>
         <table className="data-table">
           <thead>
