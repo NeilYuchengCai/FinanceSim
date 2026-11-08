@@ -64,3 +64,4 @@ backend/.deps/
 # Runtime artifacts (accidentally tracked before ignore rules)
 nul
 _tmp_verify.py
+backend/financesim.db*
