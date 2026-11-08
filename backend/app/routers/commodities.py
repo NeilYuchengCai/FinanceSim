@@ -59,10 +59,13 @@ async def step_commodities(
     days: int = Query(1, ge=1, le=365),
     volatility_mult: float = Query(1.0, ge=0.1, le=5.0)
 ):
+    """推进商品市场（铁律③：每次演化后把价格/K线落库，供重启恢复）。"""
     engine = _require_engine()
     results = {}
     for _ in range(days):
         results = engine.step(volatility_mult)
+        # 每步一落库：step 每步追加一根内存 K 线，逐根固化不丢历史
+        await engine.persist()
     return results
 
 
@@ -71,5 +74,8 @@ async def apply_shock(
     shock_type: str = Query(..., pattern="^(geopolitical|weather|demand_shock|supply_disruption|dollar_strength)$"),
     magnitude: float = Query(1.0, ge=0.1, le=5.0)
 ):
+    """应用外部冲击（冲击改价同样需要落库）。"""
     engine = _require_engine()
-    return engine.apply_shock(shock_type, magnitude)
+    results = engine.apply_shock(shock_type, magnitude)
+    await engine.persist()
+    return results

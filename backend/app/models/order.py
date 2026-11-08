@@ -1,7 +1,7 @@
 """
 FinanceSim 订单和交易模型
 """
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, func, CheckConstraint
+from sqlalchemy import Column, Integer, String, Float, Numeric, DateTime, ForeignKey, func, CheckConstraint
 from sqlalchemy.orm import relationship
 from app.models.base import Base
 
@@ -48,8 +48,9 @@ class Trade(Base):
     asset_id = Column(Integer, ForeignKey("assets.id"), nullable=False, index=True)
     order_id_buy = Column(String(36), ForeignKey("orders.id"), nullable=True)
     order_id_sell = Column(String(36), ForeignKey("orders.id"), nullable=True)
-    price = Column(Float, nullable=False)
-    quantity = Column(Float, nullable=False)
+    # 铁律②：核心金融金额/价格落地必须用 Decimal/Numeric，禁止 float 截断。
+    price = Column(Numeric(20, 8), nullable=False)
+    quantity = Column(Numeric(20, 8), nullable=False)
     # 成交方向（相对发起方视角）：BUY / SELL。
     # nullable=True 兼容历史行；新成交由 trading_engine.submit_order 注入。
     direction = Column(String(10), nullable=True)

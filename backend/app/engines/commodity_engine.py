@@ -6,7 +6,6 @@ import random
 import os
 import json
 import logging
-from decimal import Decimal, ROUND_HALF_UP
 from typing import Dict, List, Optional
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -110,11 +109,14 @@ class CommodityEngine:
         "dollar_strength": {"name": "Stronger US Dollar", "impact_range": (-0.02, -0.005), "affected": ["GC", "SI", "HG", "ALI"]},
     }
 
-    def __init__(self, seed: Optional[int] = None):
+    def __init__(self, seed: Optional[int] = None, world_id: int = 1):
         self.commodities: Dict[str, Dict] = {}
         self.price_history: Dict[str, List[Dict]] = {}
         # 实例级随机源：同一 seed 下商品演化序列可复现
         self._rng = random.Random(seed)
+        # 持久化归属的世界（铁律③：商品价格需写入统一价格历史并按此 world 恢复）
+        self._world_id = world_id
+        self._restored = False
         self._configs: Dict[str, CommodityConfig] = self._load_seed_commodities()
         self._init_commodities()
 
@@ -167,6 +169,178 @@ class CommodityEngine:
                 "inventory": config.inventory,
             }
             self.price_history[ticker] = []
+
+    # ------------------------------------------------------------------
+    # 铁律③：商品价格持久化
+    # 演化后的价格写入统一价格历史（commodity_price_history 表，与 MarketStream
+    # 的 price_history 机制对齐），重启后从 DB 恢复，不再纯内存、重启即丢。
+    # 注意：step()/apply_shock() 必须保持同步（路由层同步调用），因此持久化
+    # 拆为独立 async 方法，由调用方（startup / 每个 step 之后）await 触发。
+    # ------------------------------------------------------------------
+    async def persist(self) -> None:
+        """把当前商品状态固化到 commodities + commodity_price_history。
+
+        - 每个商品按 (ticker, world_id) upsert，更新 current_price 与供需快照；
+        - 把最新一根 K 线写入 commodity_price_history（同一商品同一时间戳
+          已存在则跳过，保证重复调用/重启后不产生重复行）；
+        - step() 每次追加一根内存 K 线，路由层每步调用一次本方法；
+          apply_shock() 直接改价但不追加 K 线，此时用当前状态补一根，
+          避免落库 K 线与 current_price 脱节。
+
+        commodities / commodity_price_history 的价格列为 Float（模型既有定义），
+        因此这里显式 float()；铁律②的 Decimal 只作用于 trades/user_economy。
+        失败只记日志，不阻断演化流程。
+        """
+        from app.database import async_session_factory
+        from app.models.commodity import Commodity, CommodityPriceHistory
+        from sqlalchemy import select
+
+        try:
+            async with async_session_factory() as session:
+                for ticker, state in self.commodities.items():
+                    cfg = state["config"]
+                    price_now = float(state["current_price"])
+                    supply_demand = {
+                        "supply": round(float(state["supply"]), 2),
+                        "demand": round(float(state["demand"]), 2),
+                    }
+                    row = (await session.execute(
+                        select(Commodity).where(
+                            Commodity.ticker == ticker,
+                            Commodity.world_id == self._world_id,
+                        )
+                    )).scalar_one_or_none()
+                    if row is None:
+                        row = Commodity(
+                            world_id=self._world_id,
+                            ticker=ticker,
+                            name=cfg.name,
+                            category=cfg.category,
+                            subcategory=cfg.subcategory,
+                            currency="USD",
+                            contract_size=cfg.contract_size,
+                            tick_size=cfg.tick_size,
+                            volatility=cfg.volatility,
+                            seasonality_factor=cfg.seasonality_factor,
+                            supply_demand=supply_demand,
+                            inventory=float(state["inventory"]),
+                            baseline_price=float(cfg.baseline_price),
+                            current_price=price_now,
+                            data_source="SIMULATED",
+                        )
+                        session.add(row)
+                        await session.flush()  # 取 row.id 供 K 线外键使用
+                    else:
+                        row.current_price = price_now
+                        row.supply_demand = supply_demand
+                        row.inventory = float(state["inventory"])
+
+                    # 选/构造最新一根 K 线
+                    hist = self.price_history.get(ticker) or []
+                    last = dict(hist[-1]) if hist else None
+                    if last is None or abs(float(last["close"]) - price_now) > 1e-9:
+                        prev = float(state.get("prev_price") or price_now)
+                        upd = state.get("last_update")
+                        last = {
+                            "timestamp": upd.isoformat() if isinstance(upd, datetime) else str(upd),
+                            "open": prev,
+                            "high": max(prev, price_now),
+                            "low": min(prev, price_now),
+                            "close": price_now,
+                            "volume": 0,
+                        }
+                    ts_raw = last["timestamp"]
+                    ts = datetime.fromisoformat(ts_raw) if isinstance(ts_raw, str) else ts_raw
+
+                    # 幂等：同一 (商品, 时间戳) 已有 K 线则跳过
+                    exists = (await session.execute(
+                        select(CommodityPriceHistory.id).where(
+                            CommodityPriceHistory.commodity_id == row.id,
+                            CommodityPriceHistory.timestamp == ts,
+                        ).limit(1)
+                    )).scalar_one_or_none()
+                    if exists is not None:
+                        continue
+
+                    session.add(CommodityPriceHistory(
+                        commodity_id=row.id,
+                        timestamp=ts,
+                        open=float(last["open"]),
+                        high=float(last["high"]),
+                        low=float(last["low"]),
+                        close=float(last["close"]),
+                        volume=int(last["volume"]),
+                        supply_snapshot=supply_demand,
+                        inventory_snapshot=round(float(state["inventory"]), 2),
+                    ))
+                await session.commit()
+        except Exception as e:  # 持久化失败不应阻断演化流程
+            logger.warning("CommodityEngine.persist failed: %s", e)
+
+    async def restore_from_db(self) -> None:
+        """服务重启后从 DB 恢复商品价格与供需/库存快照，保证演化连续。
+
+        读取 commodities.current_price 作为重启后的起点价格，并回溯最近一根
+        commodity_price_history 以获取真实的 supply/demand/inventory，同时把
+        近期历史载入内存 price_history，使 /history 接口在重启后仍有数据。
+        """
+        from app.database import async_session_factory
+        from app.models.commodity import Commodity, CommodityPriceHistory
+        from sqlalchemy import select
+
+        try:
+            async with async_session_factory() as session:
+                for ticker, state in self.commodities.items():
+                    row = (await session.execute(
+                        select(Commodity).where(
+                            Commodity.ticker == ticker,
+                            Commodity.world_id == self._world_id,
+                        )
+                    )).scalar_one_or_none()
+                    if row is None or row.current_price is None:
+                        continue
+
+                    state["current_price"] = float(row.current_price)
+                    state["prev_price"] = float(row.current_price)
+
+                    # 回溯最近一根 K 线恢复供需/库存连续性
+                    ph = (await session.execute(
+                        select(CommodityPriceHistory)
+                        .where(CommodityPriceHistory.commodity_id == row.id)
+                        .order_by(CommodityPriceHistory.timestamp.desc())
+                        .limit(1)
+                    )).scalar_one_or_none()
+                    if ph is not None:
+                        if ph.supply_snapshot:
+                            state["supply"] = float(ph.supply_snapshot.get("supply", state["supply"]))
+                            state["demand"] = float(ph.supply_snapshot.get("demand", state["demand"]))
+                        if ph.inventory_snapshot is not None:
+                            state["inventory"] = float(ph.inventory_snapshot)
+                    elif row.supply_demand:
+                        state["supply"] = float(row.supply_demand.get("supply", state["supply"]))
+                        state["demand"] = float(row.supply_demand.get("demand", state["demand"]))
+
+                    # 载入近期历史到内存，保证 /history 重启后仍可读
+                    rows = (await session.execute(
+                        select(CommodityPriceHistory)
+                        .where(CommodityPriceHistory.commodity_id == row.id)
+                        .order_by(CommodityPriceHistory.timestamp.desc())
+                        .limit(1000)
+                    )).scalars().all()
+                    self.price_history[ticker] = [
+                        {
+                            "timestamp": r.timestamp.isoformat() if r.timestamp else None,
+                            "open": r.open,
+                            "high": r.high,
+                            "low": r.low,
+                            "close": r.close,
+                            "volume": r.volume,
+                        }
+                        for r in reversed(rows)
+                    ]
+                self._restored = True
+        except Exception as e:  # 恢复失败回退到内存初值，不阻断启动
+            logger.warning("CommodityEngine.restore_from_db failed: %s", e)
 
     def step(self, volatility_mult: float = 1.0) -> Dict[str, Dict]:
         """

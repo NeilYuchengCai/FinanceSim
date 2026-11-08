@@ -84,7 +84,8 @@ class PortfolioEngine:
             self.world_id, self.cash, len(self.positions),
         )
     
-    def buy(self, ticker: str, quantity: float, price: float, trade_id: str = None) -> Dict:
+    # 铁律②：公开 API 入参与成交记录统一用 Decimal，避免 float 截断核心金额。
+    def buy(self, ticker: str, quantity: Decimal, price: Decimal, trade_id: str = None) -> Dict:
         """买入"""
         quantity_dec = Decimal(str(quantity)).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
         price_dec = Decimal(str(price)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
@@ -106,13 +107,13 @@ class PortfolioEngine:
         pos.avg_price = (old_cost + cost) / pos.quantity
         pos.update_price(price_dec)
         
-        # 记录交易
+        # 记录交易（金额以 Decimal 精确存储）
         trade = {
             "type": "BUY",
             "ticker": ticker,
-            "quantity": float(quantity_dec),
-            "price": float(price_dec),
-            "cost": float(cost),
+            "quantity": quantity_dec,
+            "price": price_dec,
+            "cost": cost,
             "timestamp": datetime.now(),
             "trade_id": trade_id
         }
@@ -122,7 +123,8 @@ class PortfolioEngine:
         
         return trade
     
-    def sell(self, ticker: str, quantity: float, price: float, trade_id: str = None) -> Dict:
+    # 铁律②：公开 API 入参与成交记录统一用 Decimal，避免 float 截断核心金额。
+    def sell(self, ticker: str, quantity: Decimal, price: Decimal, trade_id: str = None) -> Dict:
         """卖出"""
         if ticker not in self.positions:
             raise ValueError(f"No position in {ticker}")
@@ -149,14 +151,14 @@ class PortfolioEngine:
         if pos.quantity == 0:
             del self.positions[ticker]
         
-        # 记录交易
+        # 记录交易（金额以 Decimal 精确存储）
         trade = {
             "type": "SELL",
             "ticker": ticker,
-            "quantity": float(quantity_dec),
-            "price": float(price_dec),
-            "proceeds": float(quantity_dec * price_dec),
-            "realized_pnl": float(realized_pnl),
+            "quantity": quantity_dec,
+            "price": price_dec,
+            "proceeds": quantity_dec * price_dec,
+            "realized_pnl": realized_pnl,
             "timestamp": datetime.now(),
             "trade_id": trade_id
         }
@@ -174,19 +176,19 @@ class PortfolioEngine:
                 self.positions[ticker].update_price(price_dec)
     
     def get_position(self, ticker: str) -> Optional[Dict]:
-        """获取持仓详情"""
+        """获取持仓详情（金额字段一律以 Decimal 精确返回，铁律②）"""
         pos = self.positions.get(ticker)
         if not pos:
             return None
         return {
             "ticker": pos.ticker,
-            "quantity": float(pos.quantity),
-            "avg_price": float(pos.avg_price),
-            "last_price": float(pos.last_price),
-            "market_value": float(pos.market_value),
-            "cost_basis": float(pos.cost_basis),
-            "unrealized_pnl": float(pos.unrealized_pnl),
-            "realized_pnl": float(pos.realized_pnl),
+            "quantity": pos.quantity,
+            "avg_price": pos.avg_price,
+            "last_price": pos.last_price,
+            "market_value": pos.market_value,
+            "cost_basis": pos.cost_basis,
+            "unrealized_pnl": pos.unrealized_pnl,
+            "realized_pnl": pos.realized_pnl,
             "pnl_percent": pos.pnl_percent
         }
     
@@ -194,8 +196,8 @@ class PortfolioEngine:
         """获取所有持仓"""
         return [self.get_position(t) for t in self.positions.keys()]
     
-    def net_worth(self, prices: Dict[str, float] = None) -> float:
-        """计算净值。
+    def net_worth(self, prices: Optional[Dict[str, float]] = None) -> Decimal:
+        """计算净值（返回 Decimal，铁律②）。
 
         未提供价格表时，尝试从实时行情流拉取最新价，使净值随行情实时波动；
         行情流不可用（如离线/测试）时退化为使用持仓 last_price，绝不崩溃。
@@ -218,19 +220,26 @@ class PortfolioEngine:
             pos.update_price(price)
             equity_value += pos.market_value
 
-        return float(self.cash + equity_value)
+        return self.cash + equity_value
     
     def get_performance(self) -> Dict:
-        """获取绩效指标"""
+        """获取绩效指标（金额字段一律以 Decimal 精确返回，铁律②）"""
         total_value = self.net_worth()
-        total_invested = sum(t["cost"] for t in self.trade_history if t["type"] == "BUY")
-        total_realized = sum(t.get("realized_pnl", 0) for t in self.trade_history if t["type"] == "SELL")
-        
+        total_invested = sum(
+            (t["cost"] for t in self.trade_history if t["type"] == "BUY"), Decimal("0")
+        )
+        total_realized = sum(
+            (t.get("realized_pnl", Decimal("0")) for t in self.trade_history if t["type"] == "SELL"),
+            Decimal("0"),
+        )
+
         return {
-            "cash": float(self.cash),
+            "cash": self.cash,
             "total_value": total_value,
             "total_invested": total_invested,
             "total_realized_pnl": total_realized,
-            "unrealized_pnl": float(sum(p.unrealized_pnl for p in self.positions.values())),
-            "net_worth": total_value
+            "unrealized_pnl": sum(
+                (p.unrealized_pnl for p in self.positions.values()), Decimal("0")
+            ),
+            "net_worth": total_value,
         }

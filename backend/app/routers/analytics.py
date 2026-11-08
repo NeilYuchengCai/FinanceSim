@@ -88,21 +88,27 @@ async def get_portfolio_analytics(
     perf = portfolio.get_performance()
     positions = portfolio.get_all_positions()
 
-    market_value = sum(p["market_value"] for p in positions)
-    unrealized_pnl = sum(p["unrealized_pnl"] for p in positions)
-    cost_basis = sum(p["cost_basis"] for p in positions)
-    net_worth = perf.get("net_worth") or perf.get("total_value") or 0.0
-    cash = perf.get("cash", 0.0)
+    # 铁律②：PortfolioEngine 现返回 Decimal。/portfolio 是只读 HTTP 边界，
+    # 参与除法/round 前显式转 float，避免 Decimal 与 float 混算；
+    # 写入 DB 的路径仍保持 Decimal 不在此转换。
+    market_value = sum(float(p["market_value"]) for p in positions)
+    unrealized_pnl = sum(float(p["unrealized_pnl"]) for p in positions)
+    cost_basis = sum(float(p["cost_basis"]) for p in positions)
+    net_worth = float(perf.get("net_worth") or perf.get("total_value") or 0.0)
+    cash = float(perf.get("cash", 0.0))
+    realized_pnl = float(perf.get("total_realized_pnl", 0.0))
+    total_invested = float(perf.get("total_invested", 0.0))
+    total_value = float(perf.get("total_value", 0.0))
 
     metrics = {
         "cash": cash,
         "market_value": round(market_value, 2),
         "cost_basis": round(cost_basis, 2),
         "unrealized_pnl": round(unrealized_pnl, 2),
-        "realized_pnl": round(perf.get("total_realized_pnl", 0.0), 2),
-        "total_invested": round(perf.get("total_invested", 0.0), 2),
+        "realized_pnl": round(realized_pnl, 2),
+        "total_invested": round(total_invested, 2),
         "net_worth": round(net_worth, 2),
-        "total_value": round(perf.get("total_value", 0.0), 2),
+        "total_value": round(total_value, 2),
         "position_count": len(positions),
         "cash_weight": round(cash / net_worth, 4) if net_worth else 0.0,
         "positions": positions,

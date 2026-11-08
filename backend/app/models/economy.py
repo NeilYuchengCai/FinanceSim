@@ -1,7 +1,7 @@
 """
 FinanceSim 用户经济模型
 """
-from sqlalchemy import Column, Integer, Float, DateTime, ForeignKey, func, CheckConstraint
+from sqlalchemy import Column, Integer, Float, Numeric, DateTime, ForeignKey, func, CheckConstraint
 from sqlalchemy.orm import relationship
 from app.models.base import Base
 
@@ -15,7 +15,8 @@ class UserEconomy(Base):
     
     id = Column(Integer, primary_key=True)
     world_id = Column(Integer, ForeignKey("worlds.id", ondelete="CASCADE"), unique=True, nullable=False)
-    cash = Column(Float, nullable=False, default=0)
+    # 铁律②：核心金融金额（现金）落地必须用 Decimal/Numeric，禁止 float 截断。
+    cash = Column(Numeric(24, 8), nullable=False, default=0)
     income_monthly = Column(Float, nullable=False, default=0)
     expenses_monthly = Column(Float, nullable=False, default=0)
     debt = Column(Float, nullable=False, default=0)
@@ -43,7 +44,10 @@ class UserEconomy(Base):
             getattr(self, f"position_{asset}", 0) * price 
             for asset, price in asset_prices.items()
         )
-        return self.cash + equity_value - self.debt
+        # cash 为 Numeric/Decimal；本辅助方法按 float 口径返回，
+        # 在读边界显式转换，避免 Decimal 与 float 混算抛 TypeError
+        # （落库路径仍保持 Decimal，铁律②）。
+        return float(self.cash) + equity_value - self.debt
     
     def __repr__(self):
         return f"<UserEconomy(world_id={self.world_id}, cash={self.cash})>"

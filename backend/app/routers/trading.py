@@ -33,6 +33,23 @@ ORDERS_LIMIT_CAP = 200
 TRADES_LIMIT_CAP = 500
 
 
+def _jsonable(value):
+    """HTTP 响应边界：把引擎/DB 读回的 Decimal 转成 JSON 数字。
+
+    铁律②要求落库路径保持 Decimal；但接口层直接返回 Decimal 时，
+    FastAPI 的 jsonable_encoder 虽能处理，参与前端 float 运算或某些序列化
+    分支仍可能踩类型混用。这里只在**读接口边界**统一转换，
+    不触碰任何写入 DB 的路径。
+    """
+    if isinstance(value, Decimal):
+        return float(value)
+    if isinstance(value, dict):
+        return {k: _jsonable(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_jsonable(v) for v in value]
+    return value
+
+
 def get_trading_engine(world_id: int) -> TradingEngine:
     if world_id not in trading_engines:
         trading_engines[world_id] = TradingEngine(world_id)
@@ -107,14 +124,17 @@ async def _persist_trading_state(
                 ts = datetime.fromisoformat(ts)
             except ValueError:
                 ts = None
+        # 无条件落库：timestamp 本来就是 datetime 的正常路径也必须写成交记录。
+        # 此前误缩进到 `if isinstance(ts, str)` 内，导致绝大多数成交完全不落库。
         session.add(Trade(
             id=tr.get("id") or str(uuid.uuid4()),
             world_id=world.id,
             asset_id=asset.id,
             order_id_buy=tr.get("order_id_buy"),
             order_id_sell=tr.get("order_id_sell"),
-            price=float(tr.get("price") or 0),
-            quantity=float(tr.get("quantity") or 0),
+            # 铁律②：金额/价格直接以 Decimal 落地，禁止 float() 截断核心金额
+            price=Decimal(str(tr.get("price") or 0)),
+            quantity=Decimal(str(tr.get("quantity") or 0)),
             direction=tr.get("direction") or result["side"],
             timestamp=ts or datetime.now(),
             world_day=world.current_day,
@@ -133,25 +153,26 @@ async def _persist_trading_state(
             id=str(uuid.uuid4()),
             world_id=world.id,
             asset_id=asset.id,
-            quantity=pos["quantity"],
-            avg_price=pos["avg_price"],
-            last_price=pos["last_price"],
-            unrealized_pnl=pos["unrealized_pnl"],
+            quantity=float(pos["quantity"]),
+            avg_price=float(pos["avg_price"]),
+            last_price=float(pos["last_price"]),
+            unrealized_pnl=float(pos["unrealized_pnl"]),
         ))
     else:
-        existing.quantity = pos["quantity"]
-        existing.avg_price = pos["avg_price"]
-        existing.last_price = pos["last_price"]
-        existing.unrealized_pnl = pos["unrealized_pnl"]
+        existing.quantity = float(pos["quantity"])
+        existing.avg_price = float(pos["avg_price"])
+        existing.last_price = float(pos["last_price"])
+        existing.unrealized_pnl = float(pos["unrealized_pnl"])
 
     # 现金持久化到 user_economy（重启后现金不从初始值重置）
     economy = (await session.execute(
         select(UserEconomy).where(UserEconomy.world_id == world.id)
     )).scalar_one_or_none()
     if economy is None:
-        session.add(UserEconomy(world_id=world.id, cash=float(portfolio.cash)))
+        # 铁律②：现金直接以 Decimal 落地，禁止 float() 截断
+        session.add(UserEconomy(world_id=world.id, cash=portfolio.cash))
     else:
-        economy.cash = float(portfolio.cash)
+        economy.cash = portfolio.cash
 
     await session.commit()
 
@@ -212,19 +233,21 @@ async def submit_order(
         logger.exception(f"submit_order failed for world {world_id}: {e}")
         raise HTTPException(status_code=500, detail="订单提交失败，请稍后重试")
 
-    # 同步用户投资组合（仅对成交部分入账）
+    # 同步用户投资组合（仅对成交部分入账）：金额全程 Decimal，避免 float 截断
     if result.get("trades"):
-        agg: Dict[str, Dict[str, float]] = defaultdict(lambda: {"qty": 0.0, "cost": 0.0})
+        agg: Dict[str, Dict[str, Decimal]] = defaultdict(
+            lambda: {"qty": Decimal("0"), "cost": Decimal("0")}
+        )
         for tr in result["trades"]:
             tk = tr.get("ticker")
-            q = float(tr.get("quantity", 0) or 0)
-            p = float(tr.get("price", 0) or 0)
+            q = Decimal(str(tr.get("quantity", 0) or 0))
+            p = Decimal(str(tr.get("price", 0) or 0))
             if tk and q:
                 agg[tk]["qty"] += q
                 agg[tk]["cost"] += q * p
         try:
             for tk, info in agg.items():
-                avg = info["cost"] / info["qty"] if info["qty"] else 0.0
+                avg = info["cost"] / info["qty"] if info["qty"] else Decimal("0")
                 if side == "BUY":
                     portfolio.buy(tk, info["qty"], avg)
                 elif side == "SELL":
@@ -411,7 +434,8 @@ async def list_trades(
         })
 
     out.sort(key=lambda x: x.get("timestamp") or "", reverse=True)
-    return out[:cap]
+    # Trade.price/quantity 现为 Numeric -> Decimal，读接口边界统一转 JSON 数字
+    return _jsonable(out[:cap])
 
 
 @router.get("/portfolio")
@@ -422,7 +446,7 @@ async def get_portfolio(
 ):
     """获取投资组合"""
     engine = await get_portfolio_engine(world_id, session)
-    return engine.get_performance()
+    return _jsonable(engine.get_performance())
 
 
 @router.get("/portfolio/positions")
@@ -433,4 +457,4 @@ async def get_positions(
 ):
     """获取持仓列表"""
     engine = await get_portfolio_engine(world_id, session)
-    return engine.get_all_positions()
+    return _jsonable(engine.get_all_positions())

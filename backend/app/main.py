@@ -151,11 +151,15 @@ async def lifespan(app: FastAPI):
         _event_propagation = None
         logger.exception(f"Event Engine init failed: {e}")
 
-    # 初始化商品引擎
+    # 初始化商品引擎（铁律③：按真实 world_id 归属持久化，启动时先从 DB 恢复价）
     logger.info("Initializing Commodity Engine...")
     try:
-        _commodity_engine = CommodityEngine(seed=eng_seed("commodity"))
+        _commodity_engine = CommodityEngine(
+            seed=eng_seed("commodity"), world_id=resolved_world_id
+        )
         commodities.init_commodity_engine(_commodity_engine)
+        # 与 FX 的 restore_prices 同模式：重启后从 DB 读回上轮演化价
+        await _commodity_engine.restore_from_db()
         logger.info("Commodity Engine initialized")
     except Exception as e:
         _commodity_engine = None
