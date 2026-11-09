@@ -6,6 +6,7 @@ import math
 import logging
 import json
 import os
+import random
 from decimal import Decimal
 from typing import Dict, List, Optional
 from dataclasses import dataclass, field
@@ -37,15 +38,18 @@ class Bond:
     accrued_interest: float = 0.0
     next_coupon_date: datetime = field(default_factory=datetime.now)
     
-    def update(self, market_yield: float, risk_free_rate: Optional[float] = None):
+    def update(self, market_yield: float, risk_free_rate: Optional[float] = None, sim_date=None):
         """根据市场收益率更新价格和久期。
 
         risk_free_rate 为无风险利率（取自经济引擎 interest_rate）；
         缺省时退化为 5% 的保守假设。spread = 市场收益率 - 无风险利率。
+        sim_date 为当前模拟日（datetime）；优先用于计算 remaining_days，
+        使确定性回放/快照恢复到正确的剩余期限（铁律⑤）。
         """
         rf = 0.05 if risk_free_rate is None else float(risk_free_rate)
-        # 先设置remaining_days，因为duration计算依赖它
-        self.remaining_days = (self.maturity_date - datetime.now()).days
+        # 先设置remaining_days，因为duration计算依赖它；sim_date 优先于 wall-clock
+        ref = sim_date if sim_date is not None else datetime.now()
+        self.remaining_days = (self.maturity_date - ref).days
         self.yield_to_maturity = market_yield
         self.price = self._calculate_price(market_yield)
         self.duration = self._calculate_duration(market_yield)
@@ -209,13 +213,15 @@ class BondEngine:
     # 无风险利率缺省值：经济引擎不可用（离线/测试）时的保守假设
     DEFAULT_RISK_FREE_RATE = 0.05
 
-    def __init__(self):
+    def __init__(self, seed: Optional[int] = None):
         self.bonds: Dict[str, Bond] = {}
         self.yield_curve = YieldCurve()
         self.yield_curve._rebuild_curve()  # 初始化收益率曲线
         self.history: List[Dict] = []
         # 当前无风险利率：由经济引擎 interest_rate 同步，spread 计算以此为基准
         self.risk_free_rate: float = self.DEFAULT_RISK_FREE_RATE
+        # 实例级可复现随机源：同一 seed 下债券演化序列可复现（铁律⑤）
+        self._rng = random.Random(seed)
 
         # 初始化默认债券
         self._init_bonds()
@@ -324,16 +330,15 @@ class BondEngine:
             self.bonds[ticker] = bond
         logger.info(f"BondEngine initialized {len(self.bonds)} bonds from builtin list")
 
-    def step(self, days: int = 1, shocks: Optional[Dict] = None):
-        """推进债券市场"""
-        import random
-
+    def step(self, days: int = 1, shocks: Optional[Dict] = None, sim_date=None):
+        """推进债券市场。sim_date 为当前模拟日（datetime），传入后债券剩余期限
+        按模拟日计算，保证确定性（铁律⑤）。"""
         # 每次推进前同步无风险利率，使 spread 跟随宏观利率演化
         self.sync_risk_free_rate()
 
         for day_index in range(days):
             # 收益率曲线移动
-            rate_change = random.gauss(0, 0.0002)
+            rate_change = self._rng.gauss(0, 0.0002)
 
             # 应用冲击
             if shocks:
@@ -353,7 +358,7 @@ class BondEngine:
                 if bond.bond_type == "CORPORATE" and shocks and "credit_spread_widen" in shocks:
                     spread += shocks["credit_spread_widen"] * 0.005
 
-                bond.update(base_yield + spread, self.risk_free_rate)
+                bond.update(base_yield + spread, self.risk_free_rate, sim_date=sim_date)
 
             # 记录历史：每第 5 个模拟日记一次（按日内索引判断，
             # 旧代码用总天数 days % 5 判断，多日步进时要么每步都记要么从不记）

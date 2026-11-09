@@ -74,7 +74,7 @@ async def lifespan(app: FastAPI):
     # 初始化经济引擎
     logger.info("Initializing Economic Engine...")
     try:
-        _economic_engine = EconomicEngine()
+        _economic_engine = EconomicEngine(seed=eng_seed("economy"))
         _central_bank = CentralBank(_economic_engine)
         economy.init_economy(_economic_engine, _central_bank)
         logger.info("Economic Engine initialized")
@@ -86,7 +86,7 @@ async def lifespan(app: FastAPI):
     # 初始化债券引擎
     logger.info("Initializing Bond Engine...")
     try:
-        _bond_engine = BondEngine()
+        _bond_engine = BondEngine(seed=eng_seed("bond"))
         bonds.init_bond_engine(_bond_engine)
         logger.info("Bond Engine initialized")
     except Exception as e:

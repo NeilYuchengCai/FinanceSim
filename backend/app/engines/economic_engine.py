@@ -4,6 +4,7 @@ FinanceSim Economic Engine
 """
 import math
 import logging
+import random
 from decimal import Decimal
 from typing import Dict, List, Optional
 from dataclasses import dataclass, field
@@ -94,13 +95,15 @@ class EconomicEngine:
     # 经济周期参数
     CYCLE_PERIOD_DAYS = 252 * 4  # 约4年经济周期
     
-    def __init__(self, initial_state: Optional[MacroState] = None):
+    def __init__(self, initial_state: Optional[MacroState] = None, seed: Optional[int] = None):
         self.state = initial_state or MacroState()
         self.history: List[Dict] = []
         self._gdp_history: List[float] = []
         self._inflation_history: List[float] = []
         # 外部数据是否已用于种子/覆盖（保证只种子一次，不与合成演化反复打架）
         self._externally_seeded: bool = False
+        # 实例级可复现随机源：同一 seed 下宏观演化序列可复现（铁律⑤）
+        self._rng = random.Random(seed)
 
         # 记录初始状态
         self.history.append(self.state.to_dict())
@@ -165,9 +168,8 @@ class EconomicEngine:
         """计算GDP变化"""
         change = 0.0
         
-        # 随机波动
-        import random
-        change += random.gauss(0, 0.003)
+        # 随机波动（走可复现随机源，铁律⑤）
+        change += self._rng.gauss(0, 0.003)
         
         # 均值回归到长期增长率
         long_term = 0.025
@@ -239,9 +241,8 @@ class EconomicEngine:
         # 均值回归
         change += (1.0 - self.state.consumer_confidence) * 0.01
         
-        # 随机波动
-        import random
-        change += random.gauss(0, 0.005)
+        # 随机波动（走可复现随机源，铁律⑤）
+        change += self._rng.gauss(0, 0.005)
         
         # 外部冲击
         if "confidence_shock" in shocks:
@@ -252,8 +253,7 @@ class EconomicEngine:
     def _update_industrial_production(self, gdp_change: float):
         """更新工业生产"""
         change = gdp_change * 1.2  # 工业生产波动更大
-        import random
-        change += random.gauss(0, 0.002)
+        change += self._rng.gauss(0, 0.002)
         self.state.industrial_production *= (1 + change)
     
     def _update_money_supply(self, shocks: Dict):

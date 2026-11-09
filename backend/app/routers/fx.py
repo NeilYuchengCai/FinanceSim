@@ -39,9 +39,14 @@ async def get_rates():
     所有展示货币（USD/EUR/CNY/CHF 等）在种子/默认货币对里均有通往 USD 的路径。
     """
     engine = _require_engine()
+    try:
+        rates = engine.get_usd_rates()
+    except ValueError as e:
+        # 数据正确性：缺失展示货币时拒绝静默兜底，明确告知上游汇率数据不完整
+        raise HTTPException(status_code=400, detail=str(e))
     return {
         "base": "USD",
-        "rates": engine.get_usd_rates(),
+        "rates": rates,
         "data_source": "SIMULATED",
     }
 

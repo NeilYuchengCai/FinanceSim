@@ -71,9 +71,10 @@ class SafeDict(dict):
         """为模板中缺失的占位符生成合理的随机默认值（统一走 self._rng，铁律⑤）。"""
         rng = self._rng
         mapping = {
-            "company": lambda: rng.choice(NewsGenerator.COMPANIES),
-            "company1": lambda: rng.choice(NewsGenerator.COMPANIES),
-            "company2": lambda: rng.choice([c for c in NewsGenerator.COMPANIES if True]),
+            # 占位兜底：不再注入硬编码美股 ticker（铁律①）；真实路径总会显式传入 company
+            "company": lambda: "Company",
+            "company1": lambda: "Company",
+            "company2": lambda: "Company",
             "sector": lambda: rng.choice(NewsGenerator.SECTORS),
             "eps": lambda: round(rng.random() * 3.5 + 0.5, 2),
             "expected": lambda: round(rng.random() * 3.5 + 0.5, 2),
@@ -245,8 +246,8 @@ class NewsGenerator:
         # 生成公司级新闻
         news_list.extend(self._generate_company_news(assets))
         
-        # 补足到最低数量，避免新闻列表过度稀疏
-        fallback = assets or [{"ticker": c, "sector": "Technology"} for c in self.COMPANIES]
+        # 不使用硬编码美股兜底：无真实资产时宁可新闻稀疏，也绝不伪造 AAPL/MSFT 等 ticker（铁律①）
+        fallback = assets or []
         attempts = 0
         while len(news_list) < min_count and attempts < 25:
             attempts += 1
@@ -662,11 +663,12 @@ class NewsGenerator:
                 }
                 
                 if event_type == "merger_acquisition":
-                    # 并购需要两家不同的公司，否则 headline 会变成自己收购自己
+                    # 并购需要两家不同的真实公司；无其它真实资产时跳过，绝不伪造硬编码 ticker（铁律①）
                     others = [a.get("ticker") for a in assets if a.get("ticker") and a.get("ticker") != ticker]
-                    pool = others or [c for c in self.COMPANIES if c != ticker]
+                    if not others:
+                        continue
                     kwargs["company1"] = ticker
-                    kwargs["company2"] = self._rng.choice(pool) if pool else self._rng.choice(self.COMPANIES)
+                    kwargs["company2"] = self._rng.choice(others)
                 else:
                     kwargs["company"] = ticker
                 
@@ -917,25 +919,8 @@ class NewsEngine:
         except Exception as e:
             logger.warning(f"Market-linked ensure_populated failed, falling back to template: {e}")
 
-        # 兜底：无行情数据时退回模版生成
-        if assets is None:
-            assets = [
-                {"ticker": t, "name": t, "sector": s}
-                for t, s in [
-                    ("AAPL", "Technology"), ("MSFT", "Technology"), ("NVDA", "Technology"),
-                    ("JPM", "Financials"), ("JNJ", "Healthcare"), ("XOM", "Energy"),
-                    ("AMZN", "Consumer Discretionary"), ("TSLA", "Consumer Discretionary"),
-                    ("CAT", "Industrials"), ("PG", "Consumer Staples"),
-                ]
-            ]
-        if macro_state is None:
-            macro_state = {
-                "gdp_growth": 0.025,
-                "inflation": 0.024,
-                "unemployment": 0.048,
-                "interest_rate": 0.05,
-            }
-        self.generate_daily_news(assets, macro_state)
+        # 兜底：无行情数据时不再伪造硬编码美股/宏观，直接返回（新闻留空由路由层兜底，铁律①）
+        return
 
     def generate_daily_news(self, assets: List[Dict], macro_state: Optional[Dict] = None) -> List[Dict]:
         """生成每日新闻（模版版，供测试端点 /generate 使用）"""

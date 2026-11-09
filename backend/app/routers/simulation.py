@@ -4,11 +4,15 @@ FinanceSim Simulation Router
 """
 import logging
 import random
+import random as _random
 import uuid
 from datetime import datetime, timedelta
 from typing import Dict
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
+
+# 事件闸门的确定性随机源：避免依赖全局未播种 random，使模拟重放可复现（铁律⑤）
+_sim_event_rng = _random.Random(0xC0FFEE)
 
 from app.database import get_session
 from app.dependencies import get_world_or_404
@@ -283,6 +287,35 @@ async def _run_daily_generators(world_id: int, session: AsyncSession, day: int, 
     except Exception as e:
         logger.error(f"macro snapshot persist failed: {e}")
 
+    # 1c) 推进债券市场 1 天（确定性随机源 + 模拟日驱动），并把债券权威定价
+    #     回灌 assets 表与行情流（行情流已在 advance() 跳过债券 GBM，Commit 1）。
+    try:
+        from app.routers.bonds import _bond_engine
+        if _bond_engine is not None:
+            _bond_engine.step(1, sim_date=day_dt)
+            from app.models import Asset
+            from sqlalchemy import select, text
+            stream = get_market_stream()
+            bond_rows = (
+                await session.execute(
+                    select(Asset.id, Asset.ticker)
+                    .where(Asset.world_id == world_id, Asset.type == "BOND")
+                )
+            ).all()
+            for aid, ticker in bond_rows:
+                bond = _bond_engine.get_bond(ticker)
+                if bond is None:
+                    continue
+                await session.execute(
+                    text("UPDATE assets SET current_price = :price WHERE id = :aid"),
+                    {"price": float(bond.price), "aid": int(aid)},
+                )
+                if stream is not None:
+                    stream.update_price(ticker, bond.price)
+            await session.commit()
+    except Exception as e:
+        logger.error(f"bond step/persist failed: {e}")
+
     # 2) AI 交易员自动交易（真实引擎 + 实时行情），制造市场活动
     try:
         from app.routers.bot import run_bots_for_world
@@ -301,7 +334,7 @@ async def _run_daily_generators(world_id: int, session: AsyncSession, day: int, 
         assets = []
         if stream is not None:
             assets = [{"ticker": s["t"], "sector": s.get("s") or "Unknown"} for s in stream.snapshot_full()]
-        if _event_generator is not None and assets and random.random() < 0.7:
+        if _event_generator is not None and assets and _sim_event_rng.random() < 0.7:
             ev = _event_generator.generate_event(assets, list({a["sector"] for a in assets}))
             await persist_event(world_id, ev, session)
             # 冲击封顶 ±5% 并按资产波动率/事件类型差异化（明细由函数内记录日志）

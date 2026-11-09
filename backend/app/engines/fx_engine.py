@@ -236,9 +236,15 @@ class FXEngine:
             elif quote in rates and base not in rates:
                 rates.setdefault(base, rates[quote] * price)
 
-        # 兜底：对仍缺失的展示货币（极少见）给 1.0，转换器会按"不变"处理而非崩溃
-        for code in ("EUR", "CNY", "CHF", "GBP", "JPY"):
-            rates.setdefault(code, 1.0)
+        # 数据正确性：缺失的展示货币绝不能静默给 1.0（会让转换器按"不变"错误换算），
+        # 必须显式报错，由上层端点转成 400，提示上游种子/汇率数据不完整。
+        missing = [c for c in ("EUR", "CNY", "CHF", "GBP", "JPY") if c not in rates]
+        if missing:
+            logger.warning(
+                "FX get_usd_rates: unresolved display currencies %s; refusing silent 1.0 fallback",
+                missing,
+            )
+            raise ValueError(f"FX rate unavailable for: {', '.join(missing)}")
         return rates
 
     def get_price_history(self, ticker: str, limit: int = 100) -> List[Dict]:

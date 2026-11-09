@@ -12,7 +12,7 @@ from decimal import Decimal
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete as sql_delete
 
-from app.models import World, Asset, PriceHistory, Order, Trade, Position, Event, News, MacroSnapshot, WorldSnapshot
+from app.models import World, Asset, PriceHistory, Order, Trade, Position, Event, News, MacroSnapshot, WorldSnapshot, UserEconomy
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +47,18 @@ class SnapshotService:
             select(Position).where(Position.world_id == world_id)
         )
         positions = positions_result.scalars().all()
+
+        # 成交与用户经济：快照必须完整回滚组合状态（持仓/成交/现金），
+        # 否则恢复后交易与价格互相矛盾。
+        trades_result = await session.execute(
+            select(Trade).where(Trade.world_id == world_id)
+        )
+        trades = trades_result.scalars().all()
+
+        user_economy_result = await session.execute(
+            select(UserEconomy).where(UserEconomy.world_id == world_id)
+        )
+        user_economy = user_economy_result.scalars().one_or_none()
 
         events_result = await session.execute(
             select(Event).where(Event.world_id == world_id).order_by(Event.created_at.desc()).limit(100)
@@ -114,6 +126,33 @@ class SnapshotService:
                 "unrealized_pnl": pos.unrealized_pnl,
             })
 
+        # 构建成交摘要（asset_id -> ticker 反查，Decimal 金额转 float 存储）
+        asset_id_to_ticker = {a.id: a.ticker for a in assets}
+        trade_summaries = []
+        for tr in trades:
+            trade_summaries.append({
+                "id": tr.id,
+                "asset_id": tr.asset_id,
+                "asset_ticker": asset_id_to_ticker.get(tr.asset_id, None),
+                "price": float(tr.price) if tr.price is not None else 0.0,
+                "quantity": float(tr.quantity) if tr.quantity is not None else 0.0,
+                "direction": tr.direction,
+                "world_day": tr.world_day,
+                "timestamp": tr.timestamp.isoformat() if tr.timestamp else None,
+            })
+
+        # 构建用户经济摘要（cash 为 Decimal -> float 存储，恢复时再转回 Decimal）
+        user_economy_summary = None
+        if user_economy is not None:
+            user_economy_summary = {
+                "cash": float(user_economy.cash) if user_economy.cash is not None else 0.0,
+                "income_monthly": user_economy.income_monthly,
+                "expenses_monthly": user_economy.expenses_monthly,
+                "debt": user_economy.debt,
+                "credit_score": user_economy.credit_score,
+                "tax_rate": user_economy.tax_rate,
+            }
+
         # 构建事件摘要
         event_summaries = []
         for ev in events:
@@ -152,6 +191,8 @@ class SnapshotService:
             "summary": summary,
             "assets": asset_summaries,
             "positions": position_summaries,
+            "trades": trade_summaries,
+            "user_economy": user_economy_summary,
             "events": event_summaries,
             "news": news_summaries,
             "macro": macro_summaries,
@@ -276,6 +317,88 @@ class SnapshotService:
 
         await session.commit()
 
+        # 完整回滚组合状态：持仓 / 成交 / 现金。仅恢复价格会让交易状态与世界不自洽。
+        # 1) 反查当前世界资产：旧 asset_id -> ticker -> 当前 Asset
+        current_assets = (
+            await session.execute(
+                select(Asset).where(Asset.world_id == world_id)
+            )
+        ).scalars().all()
+        id_to_ticker = {a.id: a.ticker for a in current_assets}
+        ticker_to_asset = {a.ticker: a for a in current_assets}
+
+        # 2) 清空旧持仓与成交（全量重建，避免残留与快照不一致）
+        await session.execute(
+            sql_delete(Position).where(Position.world_id == world_id)
+        )
+        await session.execute(
+            sql_delete(Trade).where(Trade.world_id == world_id)
+        )
+
+        # 3) 重建持仓
+        for pos_data in state.get("positions", []):
+            old_asset_id = pos_data.get("asset_id")
+            ticker = id_to_ticker.get(old_asset_id) if old_asset_id is not None else None
+            asset = ticker_to_asset.get(ticker) if ticker else None
+            if asset is None:
+                continue
+            session.add(Position(
+                # 主键为 String(36) UUID，必须显式生成
+                id=str(uuid.uuid4()),
+                world_id=world_id,
+                asset_id=asset.id,
+                quantity=float(pos_data.get("quantity", 0)),
+                avg_price=float(pos_data.get("avg_price", 0)),
+                last_price=float(pos_data.get("last_price") or pos_data.get("avg_price", 0)),
+                unrealized_pnl=float(pos_data.get("unrealized_pnl", 0)),
+            ))
+
+        # 4) 重建成交（Decimal 金额按字符串还原，避免 float 截断）
+        for tr_data in state.get("trades", []):
+            old_asset_id = tr_data.get("asset_id")
+            ticker = id_to_ticker.get(old_asset_id) if old_asset_id is not None else None
+            asset = ticker_to_asset.get(ticker) if ticker else None
+            if asset is None:
+                continue
+            ts = tr_data.get("timestamp")
+            if isinstance(ts, str):
+                try:
+                    ts = dt.fromisoformat(ts)
+                except ValueError:
+                    ts = None
+            session.add(Trade(
+                id=str(uuid.uuid4()),
+                world_id=world_id,
+                asset_id=asset.id,
+                order_id_buy=tr_data.get("order_id_buy"),
+                order_id_sell=tr_data.get("order_id_sell"),
+                price=Decimal(str(tr_data.get("price") or 0)),
+                quantity=Decimal(str(tr_data.get("quantity") or 0)),
+                direction=tr_data.get("direction"),
+                timestamp=ts or dt.now(),
+                world_day=tr_data.get("world_day"),
+            ))
+
+        # 5) 恢复用户经济（cash 转回 Decimal）
+        ue_data = state.get("user_economy")
+        if ue_data is not None:
+            existing_ue = (
+                await session.execute(
+                    select(UserEconomy).where(UserEconomy.world_id == world_id)
+                )
+            ).scalar_one_or_none()
+            if existing_ue is None:
+                existing_ue = UserEconomy(world_id=world_id)
+                session.add(existing_ue)
+            existing_ue.cash = Decimal(str(ue_data.get("cash", 0)))
+            existing_ue.income_monthly = ue_data.get("income_monthly", 0)
+            existing_ue.expenses_monthly = ue_data.get("expenses_monthly", 0)
+            existing_ue.debt = ue_data.get("debt", 0)
+            existing_ue.credit_score = ue_data.get("credit_score", 700)
+            existing_ue.tax_rate = ue_data.get("tax_rate", 0.2)
+
+        await session.commit()
+
         logger.info(f"Restored world {world_id} to snapshot '{snapshot.name}' (day {snapshot.snapshot_day})")
 
         return {
@@ -324,6 +447,7 @@ class SnapshotService:
                 market_cap=asset_data.get("market_cap"),
                 beta=asset_data.get("beta"),
                 volatility=asset_data.get("volatility"),
+                current_price=asset_data.get("latest_price"),
                 fundamentals=asset_data.get("fundamentals"),
             )
             session.add(asset)
