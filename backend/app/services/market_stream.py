@@ -35,9 +35,33 @@ logger = logging.getLogger(__name__)
 # trading_calendar 由另一位同事并行开发，可能尚未落地。
 # 导入失败时降级为"始终交易"，避免本模块因依赖他人而崩溃。
 try:
-    from app.services.trading_calendar import is_trading_day as _is_trading_day
+    from app.services.trading_calendar import (
+        is_trading_day as _is_trading_day,
+        is_open_for as _is_open_for,
+    )
 except ImportError:  # pragma: no cover - 依赖未就绪时的降级分支
     _is_trading_day = None
+    _is_open_for = None
+
+
+# ---------------------------------------------------------------- 仿真时钟注入
+# routers/simulation 在启动时把"当前世界的 SimulationClock.current_time"接进来，
+# 使行情流对每类资产按真实模拟时间判定开市/休市（严格停盘）。
+# 未注入时退化为 wall-clock datetime.now()，保持向后兼容。
+_sim_clock_provider = None
+
+
+def set_sim_clock_provider(fn) -> None:
+    """注入"返回当前模拟时间(datetime)"的回调，由 routers/simulation 调用。"""
+    global _sim_clock_provider
+    _sim_clock_provider = fn
+
+
+def get_sim_clock_time() -> datetime:
+    """当前模拟时间；未注入时退回 wall-clock。"""
+    if _sim_clock_provider is not None:
+        return _sim_clock_provider()
+    return datetime.now()
 
 
 # ---------------------------------------------------------------- 仿真参数
@@ -170,7 +194,6 @@ class MarketStream:
         self._tick_task: Optional[asyncio.Task] = None
         self._persist_task: Optional[asyncio.Task] = None
         self._running = False
-        self._trading_cache: tuple[float, bool] = (0.0, True)
         # 实例级随机源：同一 seed 下价格游走序列可复现（restore/重放一致）
         self._rng = random.Random(seed)
         # 模拟暂停回调：由 routers/simulation 注入，返回当前 world 的
@@ -453,34 +476,32 @@ class MarketStream:
         return out
 
     # ------------------------------------------------------------ 推进
-    def _is_trading_now(self) -> bool:
-        if _is_trading_day is None:
+    def _is_open_for(self, asset_type: str) -> bool:
+        """某资产类型当前是否开市（严格停盘判定）。
+
+        - trading_calendar 未就绪（导入失败）时，降级为"始终开市"，保持旧行为；
+        - 否则按资产类别 + 当前模拟时间判定（外汇/商品 7×24 仅周末休市，
+          股票类含 09:30~16:00 盘中判定）。
+        任何异常都按"开市"处理，避免行情被长期冻结。
+        """
+        if _is_trading_day is None or _is_open_for is None:
             return True
-        now = time.monotonic()
-        cached_at, cached_value = self._trading_cache
-        if now - cached_at < TRADING_CACHE_SECONDS:
-            return cached_value
-        value = True
         try:
-            try:
-                value = bool(_is_trading_day(datetime.now()))
-            except TypeError:
-                value = bool(_is_trading_day(datetime.now().date()))
+            return bool(_is_open_for(asset_type, get_sim_clock_time()))
         except Exception as exc:
-            logger.warning("trading_calendar unavailable (%s), falling back to always-trading", exc)
-            value = True
-        self._trading_cache = (now, value)
-        return value
+            logger.warning("trading_calendar check failed (%s), falling back to open", exc)
+            return True
 
     def advance(self) -> List[dict]:
-        """推进一个 tick，返回本次**发生变化**的条目。"""
+        """推进一个 tick，返回本次**发生变化**的条目。
+
+        严格停盘：每个资产按其自身市场状态决定是否演进——
+        - 该资产对应市场休市 -> 冻结价格（不演进、不广播）；
+        - 债券(BOND)由 BondEngine 驱动，行情流跳过其 GBM；
+        - 开市的资产以满波动率(vol_scale=1.0)演进。
+        """
         if not self._assets:
             return []
-
-        trading = self._is_trading_now()
-        if not trading and not TICK_WHEN_MARKET_CLOSED:
-            return []
-        vol_scale = 1.0 if trading else OFF_SESSION_VOL_SCALE
 
         # 本 tick 覆盖的模拟秒数（由倍速档位决定）。每模拟秒波动率为 state.sigma，
         # 多秒累计的方差线性叠加，故标准差按 sqrt(模拟秒数) 缩放 —— GBM 严格正确。
@@ -490,6 +511,14 @@ class MarketStream:
 
         items: List[dict] = []
         for state in self._assets.values():
+            # 严格停盘：该资产的市场休市时冻结价格
+            if not self._is_open_for(state.asset_type):
+                continue
+            # 债券由 BondEngine 权威驱动，行情流跳过其 GBM
+            if state.asset_type == "BOND":
+                continue
+            # 开市时以满波动率演进
+            vol_scale = 1.0
             # 几何布朗运动 + 极弱均值回复
             sigma = state.sigma * sec_factor * vol_scale
             pull = -MEAN_REVERSION * sim_sec * math.log(state.price / state.anchor)
@@ -506,6 +535,18 @@ class MarketStream:
             items.append({"t": state.ticker, "p": rounded,
                           "c": round(state.change_pct(rounded), 2)})
         return items
+
+    def update_price(self, ticker: str, price: float) -> bool:
+        """外部权威源（如 BondEngine 步进后）回灌某资产的最新价。
+
+        用于把债券的权威定价写入行情流，使交易/前端/快照拿到的是最新价。
+        返回是否命中并更新成功。
+        """
+        state = self._assets.get(ticker)
+        if state is None:
+            return False
+        state.price = max(float(price), PRICE_FLOOR)
+        return True
 
     async def _tick_loop(self) -> None:
         while self._running:

@@ -14,7 +14,7 @@ from app.database import get_session
 from app.dependencies import get_world_or_404
 from app.models import World
 from app.engines.simulation_engine import SimulationClock, SimulationSpeed
-from app.services.market_stream import get_market_stream
+from app.services.market_stream import get_market_stream, set_sim_clock_provider
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +49,9 @@ async def get_sim_clock(world_id: int, session: AsyncSession) -> SimulationClock
         stream.set_sim_seconds_per_tick(
             SimulationClock.SIM_SECONDS_PER_TICK.get(sim_clocks[world_id].speed, 1)
         )
+        # 把"当前世界的模拟时间"注入行情流，使其按真实模拟时间严格判定
+        # 各类资产的开市/休市（09:30~16:00 盘中、周末、节假日），实现严格停盘。
+        set_sim_clock_provider(lambda: sim_clocks[world_id].current_time)
     except Exception as exc:  # pragma: no cover - 防御性兜底
         logger.warning("Failed to wire pause provider to market stream: %s", exc)
 

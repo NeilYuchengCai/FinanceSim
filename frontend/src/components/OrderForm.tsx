@@ -82,9 +82,15 @@ export default function OrderForm({
       })
       toast.success(t('toast.orderSubmitted'))
       onSubmitted?.(res.data?.id)
-    } catch (err) {
-      setError(t('common.error'))
-      toast.error(t('toast.orderSubmitFailed'))
+    } catch (err: any) {
+      // 把后端返回的具体错误（如"市场休市，市价单不可提交"）透传给用户，
+      // 而不是只显示一句笼统的失败提示。
+      const detail =
+        err?.response?.data?.detail ||
+        err?.message ||
+        t('common.error')
+      setError(detail)
+      toast.error(detail)
     } finally {
       setSubmitting(false)
     }

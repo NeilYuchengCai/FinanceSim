@@ -220,3 +220,28 @@ def previous_trading_day(dt: DateLike) -> date:
             return candidate
         candidate -= timedelta(days=1)
     return candidate
+
+
+# ---------------------------------------------------------------- 资产类别路由
+# 不同资产类别遵循不同的交易时段规则：
+# - 股票类（EQUITY/ETF/INDEX/BOND）走美式交易日历（周末/节假日休市，盘前盘后收市）；
+# - 外汇/商品类（FX/COMMODITY）近似 7×24 交易，仅在周末整体休市。
+EQUITY_LIKE_CLASSES = {"EQUITY", "ETF", "INDEX", "BOND"}
+FX_LIKE_CLASSES = {"FX", "COMMODITY"}
+
+
+def market_status_for(asset_class: str, dt: DateLike) -> str:
+    """按资产类别返回市场状态（严格停盘的核心判定）。
+
+    - 外汇/商品类：周末 -> WEEKEND，其余一律 OPEN（近似 7×24）。
+    - 股票类：完全委托既有 ``market_status(dt)``（含 09:30~16:00 盘中判定、
+      周末、节假日）。
+    """
+    if (asset_class or "").upper() in FX_LIKE_CLASSES:
+        return MARKET_WEEKEND if is_weekend(_to_date(dt)) else MARKET_OPEN
+    return market_status(dt)
+
+
+def is_open_for(asset_class: str, dt: DateLike) -> bool:
+    """某资产类别在给定时刻是否处于可交易（开市）状态。"""
+    return market_status_for(asset_class, dt) == MARKET_OPEN

@@ -18,6 +18,8 @@ from app.models import Order, Trade, Position, Asset, World, UserEconomy
 from app.schemas import OrderCreate, OrderResponse, TradeResponse
 from app.engines.trading_engine import TradingEngine
 from app.engines.portfolio_engine import PortfolioEngine
+from app.services.trading_calendar import is_open_for
+from app.services import market_stream
 
 logger = logging.getLogger(__name__)
 
@@ -214,6 +216,13 @@ async def submit_order(
                 status_code=400,
                 detail=f"持仓不足：需卖出 {order_data.quantity}，当前持有 {have}",
             )
+
+    # 严格停盘（Option A）：休市时市价单不可提交，但限价/止盈止损单允许挂单等待开市。
+    if order_data.type == "MARKET" and not is_open_for(asset.type, market_stream.get_sim_clock_time()):
+        raise HTTPException(
+            status_code=400,
+            detail=f"市场休市（{asset.type}），市价单不可提交；限价单可挂单等待开市。",
+        )
 
     engine = get_trading_engine(world_id)
     try:
