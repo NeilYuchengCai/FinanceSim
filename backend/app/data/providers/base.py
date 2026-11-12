@@ -81,9 +81,11 @@ class BaseProvider:
         非 200 视为失败并抛 ``ProviderError``（不重试语义错误，但网络抖动会重试）。
         """
         last_err: Optional[Exception] = None
+        # 默认 UA：部分公开源（如 CNBC）无 UA 会拒绝或返回空结果。
+        headers = {"User-Agent": "FinanceSim/1.0 (+offline-first market simulator)"}
         for attempt in range(1, max(self.max_retries, 1) + 1):
             try:
-                async with httpx.AsyncClient(timeout=self.timeout) as client:
+                async with httpx.AsyncClient(timeout=self.timeout, headers=headers) as client:
                     resp = await client.request(method, url, **kwargs)
                 if resp.status_code != 200:
                     raise ProviderError(
