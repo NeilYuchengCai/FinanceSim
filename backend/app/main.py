@@ -233,3 +233,15 @@ async def root():
 @app.get("/health")
 async def health():
     return {"status": "healthy"}
+
+
+# ---- 生产交付：若前端静态产物存在则挂载 SPA（Docker 镜像内 /app/static；
+#      本地开发由 Vite(5174) 提供，无此目录则跳过挂载，不影响 API 与测试） ----
+import os as _os
+from fastapi.staticfiles import StaticFiles as _StaticFiles
+
+_STATIC_DIR = _os.path.normpath(_os.path.join(_os.path.dirname(__file__), "..", "static"))
+if _os.path.isdir(_STATIC_DIR):
+    # 挂载在最后、路径 "/"：显式 API 路由（/api/v1/*、/health、/docs）优先级更高，
+    # 其余未匹配路径回退到 index.html，构成单页应用。
+    app.mount("/", _StaticFiles(directory=_STATIC_DIR, html=True), name="spa")
