@@ -401,6 +401,9 @@ export const zhCN = {
     category: '分类',
     affectedAssets: '影响资产',
     noBody: '暂无正文内容',
+    source: '来源',
+    realExternal: '真实外部',
+    simulated: '平台合成',
   },
   
   // 时间线
@@ -1092,6 +1095,9 @@ export const enUS = {
     category: 'Category',
     affectedAssets: 'Affected Assets',
     noBody: 'No article body available',
+    source: 'Source',
+    realExternal: 'Real External',
+    simulated: 'Simulated',
   },
 
   timeline: {

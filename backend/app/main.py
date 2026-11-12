@@ -3,12 +3,14 @@ FinanceSim Backend Application
 FastAPI 入口
 """
 import logging
+import uuid
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import init_db, close_db, async_session_factory
 from app.config import settings
+from app.core.datasource import DataSource
 from app.routers import worlds, assets, trading, simulation, analytics, events, search, economy, bonds, news as news_router, fx, bot, snapshots, challenges, commodities
 from app.routers import realtime as realtime_router
 from app.engines import EconomicEngine, BondEngine, CentralBank, NewsEngine, FXEngine, BotEngine, EventGenerator, EventPropagation, CommodityEngine
@@ -78,6 +80,11 @@ async def lifespan(app: FastAPI):
         _central_bank = CentralBank(_economic_engine)
         economy.init_economy(_economic_engine, _central_bank)
         logger.info("Economic Engine initialized")
+        # 可选：用真实外部宏观数据（FRED 免 key）覆盖合成状态；关闸/无网则静默跳过
+        try:
+            await _economic_engine.seed_from_external()
+        except Exception as e:
+            logger.warning("External macro seed skipped: %s", e)
     except Exception as e:
         _economic_engine = None
         _central_bank = None
@@ -99,6 +106,43 @@ async def lifespan(app: FastAPI):
         _news_engine = NewsEngine(seed=eng_seed("news"), world_id=resolved_world_id)
         news_router.init_news_engine(_news_engine)
         logger.info("News Engine initialized")
+        # 可选：用真实外部新闻（RSS 免 key）覆盖合成新闻；关闸/无网则静默跳过。
+        # 仅当外部抓取成功时才把真实头条写入 News 表（替换该世界的合成新闻），
+        # 离线/限流时保留既有（合成）新闻，绝不破坏既有数据。
+        try:
+            ok = await _news_engine.refresh_external_news()
+            if ok:
+                try:
+                    from app.models.event import News as NewsRow
+                    from sqlalchemy import delete
+                    items = _news_engine.generator.news_items
+                    if items:
+                        async with async_session_factory() as _news_sess:
+                            await _news_sess.execute(
+                                delete(NewsRow).where(NewsRow.world_id == resolved_world_id)
+                            )
+                            for _it in items:
+                                _imp = getattr(_it, "importance", None)
+                                _imp = _imp.value if hasattr(_imp, "value") else str(_imp or "MARKET")
+                                _news_sess.add(NewsRow(
+                                    id=getattr(_it, "id", None) or str(uuid.uuid4()),
+                                    world_id=resolved_world_id,
+                                    headline=getattr(_it, "headline", "") or "",
+                                    body=getattr(_it, "body", "") or "",
+                                    importance=_imp,
+                                    sentiment=getattr(_it, "sentiment", None),
+                                    affected_assets=getattr(_it, "affected_assets", []) or [],
+                                    created_at=getattr(_it, "created_at", None),
+                                    # 铁律④：真实外部新闻明确标注来源与数据来源(LIVE)
+                                    source=getattr(_it, "source", None) or "RSS",
+                                    data_source=DataSource.LIVE.value,
+                                ))
+                            await _news_sess.commit()
+                            logger.info("Persisted %d external news items for world %s", len(items), resolved_world_id)
+                except Exception as e:
+                    logger.warning("External news persistence skipped: %s", e)
+        except Exception as e:
+            logger.warning("External news refresh skipped: %s", e)
     except Exception as e:
         _news_engine = None
         logger.exception(f"News Engine init failed: {e}")

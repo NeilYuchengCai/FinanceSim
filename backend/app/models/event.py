@@ -49,7 +49,13 @@ class News(Base):
     sentiment = Column(Float, nullable=True)  # -1.0 to 1.0
     affected_assets = Column(JSON, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    
+    # 真实来源：外部 RSS 源名(如 MarketWatch/CNBC) 或 FINANCESIM(本平台合成)。
+    # 铁律④：配合 data_source 区分真实外部新闻与合成新闻，杜绝以 FINANCESIM 冒充真实。
+    source = Column(String(100), nullable=True)
+    # 数据来源标注(铁律④)：LIVE=真实外部数据 / SIMULATED=本平台合成仿真。
+    # 旧行无此列时由 _ensure_columns 自动补齐，读取端回退 SIMULATED。
+    data_source = Column(String(20), nullable=True)
+
     # 关系
     world = relationship("World", back_populates="news")
     event = relationship("Event", back_populates="news_items")

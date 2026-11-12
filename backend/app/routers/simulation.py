@@ -244,8 +244,13 @@ async def _persist_macro_snapshot(world_id: int, day: int, session: AsyncSession
 
 
 async def _persist_news(world_id: int, news_items: list, session: AsyncSession) -> None:
-    """把当日生成的新闻批量写入 news 表（此前只停留在引擎内存）。"""
+    """把当日生成的新闻批量写入 news 表（此前只停留在引擎内存）。
+
+    合成/市场挂钩新闻按铁律④标注：来源 FINANCESIM、data_source=SIMULATED，
+    与启动时写入的真实外部新闻(LIVE) 明确区分。
+    """
     from app.models import News
+    from app.core.datasource import DataSource
 
     rows = []
     for n in news_items:
@@ -264,6 +269,9 @@ async def _persist_news(world_id: int, news_items: list, session: AsyncSession) 
             sentiment=n.get("sentiment"),
             affected_assets=n.get("affected_assets") or [],
             created_at=created_at,
+            # 铁律④：合成新闻明确标注来源与数据来源
+            source=n.get("source") or "FINANCESIM",
+            data_source=DataSource.SIMULATED.value,
         ))
     if not rows:
         return

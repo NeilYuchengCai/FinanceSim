@@ -12,6 +12,8 @@ interface NewsItem {
   affected_assets: string[]
   created_at: string
   is_read: boolean
+  source?: string
+  data_source?: string
 }
 
 // 后端 NewsImportance 枚举实际值（news_engine.py）：BREAKING/MAJOR/MARKET/COMPANY/MACRO/MINOR
@@ -164,6 +166,19 @@ export default function News() {
                             {item.affected_assets && item.affected_assets.length > 0 && (
                               <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
                                 {t('news.affectedAssets')}: {item.affected_assets.join(', ')}
+                              </div>
+                            )}
+                            {(item.source || item.data_source) && (
+                              <div style={{ color: 'var(--text-secondary)', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                <span>{t('news.source')}: {item.source || '—'}</span>
+                                {item.data_source && (
+                                  <span
+                                    className={`tag ${item.data_source === 'LIVE' ? 'tag-green' : 'tag-gray'}`}
+                                    style={{ fontSize: 11 }}
+                                  >
+                                    {item.data_source === 'LIVE' ? t('news.realExternal') : t('news.simulated')}
+                                  </span>
+                                )}
                               </div>
                             )}
                           </div>

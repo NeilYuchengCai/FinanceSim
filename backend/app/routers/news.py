@@ -48,6 +48,9 @@ def _row_to_dict(n: News) -> dict:
 
     新闻属 SIMULATED 类别，data_source 在序列化层标注清楚（铁律④）。
     """
+    # 真实来源：外部 RSS 源名 或 FINANCESIM(本平台合成)；旧行无 source 列时回退 FINANCESIM
+    real_source = getattr(n, "source", None)
+    real_ds = getattr(n, "data_source", None)
     return {
         "id": n.id,
         "headline": n.headline,
@@ -57,10 +60,11 @@ def _row_to_dict(n: News) -> dict:
         # 前端历史上传的是 category 参数，取值与重要度一致，这里用 importance 充当
         "category": n.importance,
         "affected_assets": n.affected_assets or [],
-        "source": "FINANCESIM",
+        "source": real_source if real_source else "FINANCESIM",
         "created_at": n.created_at.isoformat() if n.created_at else None,
         "is_read": False,
-        "data_source": DataSource.SIMULATED.value,
+        # 数据来源标注(铁律④)：真实外部新闻=LIVE，合成=SIMULATED；旧行无标注时回退 SIMULATED
+        "data_source": real_ds if real_ds else DataSource.SIMULATED.value,
     }
 
 
