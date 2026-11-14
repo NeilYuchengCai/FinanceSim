@@ -193,6 +193,8 @@ class MarketStream:
         self._subscribers: Set["asyncio.Queue[dict]"] = set()
         self._tick_task: Optional[asyncio.Task] = None
         self._persist_task: Optional[asyncio.Task] = None
+        # 外部行情播种任务（启动后在后台异步跑，绝不阻塞端口绑定 / 服务器就绪）
+        self._live_seed_task: Optional[asyncio.Task] = None
         self._running = False
         # 实例级随机源：同一 seed 下价格游走序列可复现（restore/重放一致）
         self._rng = random.Random(seed)
@@ -211,6 +213,17 @@ class MarketStream:
         self._running = True
         self._tick_task = asyncio.create_task(self._tick_loop(), name="market-stream-tick")
         self._persist_task = asyncio.create_task(self._persist_loop(), name="market-stream-persist")
+        # 可选外部行情接入（OFFLINE-FIRST）：在后台异步播种真实报价，绝不阻塞启动。
+        # 服务器先以合成价立即就绪；播种成功则价格翻 LIVE，失败（无网/限流）则静默保留合成价。
+        try:
+            from app.config import settings
+            if settings.USE_EXTERNAL_DATA:
+                self._live_seed_task = asyncio.create_task(
+                    self._maybe_seed_live_prices(self._assets),
+                    name="market-stream-live-seed",
+                )
+        except Exception:  # 配置缺失也不影响启动
+            pass
         logger.info("Market stream started with %d instruments", len(self._assets))
 
     async def stop(self) -> None:
@@ -224,6 +237,9 @@ class MarketStream:
             await asyncio.gather(*tasks, return_exceptions=True)
         self._tick_task = None
         self._persist_task = None
+        if self._live_seed_task is not None:
+            self._live_seed_task.cancel()
+            self._live_seed_task = None
         self._subscribers.clear()
         # 退出前把最新价格落库，保证重启后价格是持续演化的
         try:
@@ -317,12 +333,8 @@ class MarketStream:
             )
 
         self._assets = states
-
-        # ---------------------------------------------------------------- 可选外部行情接入（OFFLINE-FIRST）
-        # 仅在总开关打开且价格 provider 启用时，尝试用真实报价覆盖 current_price，
-        # 并把对应资产标记为 LIVE。任何失败都只记日志并保留既有合成价格，绝不中断启动。
-        # 默认 USE_EXTERNAL_DATA=False 且无 key，此分支整段跳过，行为与原先完全一致。
-        await self._maybe_seed_live_prices(states)
+        # 注意：可选外部行情播种已移出 load()，改由 start() 在后台异步执行，
+        # 以避免 217 只资产的实时报价请求阻塞服务器启动（OFFLINE-FIRST：启动不可用外部数据阻塞）。
 
     async def _maybe_seed_live_prices(self, states: Dict[str, "_AssetState"]) -> None:
         """用外部价格 provider 给内存状态播种真实报价（防御性、可选）。"""
