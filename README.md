@@ -1,102 +1,66 @@
-# FinanceSim - 金融市场模拟器
+# FinanceSim · 金融市场模拟器
 
-一个功能完整的离线优先金融市场模拟平台，支持多市场、多资产类别的实时模拟交易。
+一个在浏览器里运行的金融市场模拟项目。它把股票、债券、外汇、商品和宏观经济放进同一个可演化的世界里，用模拟时钟推进价格、成交和事件，主要用作学习和实验。
 
-## 🎯 项目特点
+## 关于这个项目
 
-- **多市场支持**：股票、外汇、债券、商品、宏观经济
-- **真实金融逻辑**：使用 Decimal 保证货币精度，确定性随机引擎
-- **离线优先**：内置 fallback 数据，无需网络即可运行
-- **专业级图表**：TradingView lightweight-charts + Recharts
-- **高性能架构**：代码分割、路由懒加载、多阶段 Docker 构建
+这个项目由个人开发者在 **AI 辅助下完成**。我负责需求、设计与验收，大量编码工作借助 AI 工具完成。作为一个练习性质的作品，它在金融逻辑、系统设计和工程质量上都还有不少可以改进的地方，欢迎指点和贡献。
 
-## 🚀 快速启动
+需要说明的是：这是一个**模拟器**，不是真实的交易系统。内置价格绝大多数是程序合成的；外部真实数据只是可选的能力，且失败会自动回退。**请不要把它用于任何真实的投资决策。**
 
-### Windows (推荐)
+## 它能做什么
+
+- **多资产模拟**：股票、债券、外汇、商品、宏观经济指标在同一世界中演化。
+- **交易与撮合**：限价单挂簿、市价单成交，计算买卖价差、手续费和大单冲击。
+- **组合与风控**：持仓、盈亏、VaR、CVaR、夏普比率等基础分析。
+- **事件传导**：新闻与事件按市场、行业、个股的相关性影响价格。
+- **AI 交易员**：几种简单策略的模拟参与者，让市场有交互对象。
+- **世界与快照**：保存、恢复、分支不同的模拟时间线。
+
+## 技术栈
+
+后端：Python 3.13+、FastAPI、SQLAlchemy（async）+ SQLite、pytest。
+前端：React 18、TypeScript、Vite 5、Zustand、Recharts + lightweight-charts。
+
+数据来源做了区分标注：`REAL`（外部实盘）、`HISTORICAL`（历史）、`SIMULATED`（合成）、`FALLBACK`（离线兜底）。默认离线优先，无网络也能运行。
+
+## 快速开始
+
+**Windows**：双击 `scripts/run.bat`。
+
+**手动启动**：
 ```bash
-双击 scripts/run.bat
-```
-
-### 手动启动
-```bash
-# 后端
+# 后端（端口 8000）
 cd backend
 python -m uvicorn app.main:app --reload --port 8000
 
-# 前端
+# 前端（端口 5174）
 cd frontend
 npm run dev
 ```
+浏览器打开 http://localhost:5174 。
 
-### Docker
+**Docker**：`docker-compose up` 。
+
+依赖见 `backend/requirements.txt` 和 `frontend/package.json`。Python 建议 3.13+，Node 建议 22+。
+
+## 测试
+
 ```bash
-docker-compose up
+# 后端
+cd backend && python -m pytest tests -q
+# 前端
+cd frontend && npm run build
 ```
 
-访问 http://localhost:5174
+编写时后端测试为 53 项通过、前端构建通过。环境不同可能需要先安装依赖。
 
-## 📊 功能特性
+## 已知不足
 
-### 市场引擎
-- **股票市场**：OHLC 定价、订单撮合、组合管理
-- **外汇市场**：8个货币对，支持冲击事件
-- **债券市场**：收益率曲线、久期/凸性分析
-- **商品市场**：10种商品，5种冲击类型
-- **宏观经济**：GDP、CPI、利率、失业率模拟
+- 合成价格只追求"看起来合理"，不保证符合真实市场的统计规律。
+- 外部数据源（CNBC / Frankfurter / FRED CSV / RSS）为免 key 的公开接口，稳定性取决于对方，随时可能失效。
+- 项目仍在迭代，接口和行为可能变化。
 
-### 高级功能
-- **事件传播**：多级衰减（直接→行业→市场→宏观）
-- **市场状态机**：CALM/BULL/BEAR/EUPHORIA/PANIC 等10种状态
-- **AI 交易员**：4种策略（价值、成长、宏观、配对）
-- **挑战模式**：6个预定义模板
-- **世界快照**：保存/恢复/分支时间线
+## 许可证
 
-### 技术分析
-- **指标引擎**：SMA、EMA、RSI、MACD
-- **风险度量**：VaR、CVaR、Sharpe Ratio
-- **可视化**：K线图、成交量、技术指标叠加
-
-## 🏗️ 技术栈
-
-### 后端
-- Python 3.13+ / FastAPI
-- SQLAlchemy + SQLite (async)
-- Pytest 测试框架
-
-### 前端
-- React 18 + TypeScript
-- Vite 5 构建工具
-- Zustand 状态管理
-- Recharts + lightweight-charts
-
-## 📈 当前进度
-
-- ✅ Phase 1-7：核心框架、交易市场、分析引擎
-- ✅ Phase 8：高级参与者（AI 交易员）
-- ✅ Phase 9：全球资产（商品市场）
-- ✅ Phase 10：性能优化 + QA
-- ✅ 后端测试：27/27 通过
-- ✅ 前端构建：成功
-- ✅ 离线模式：完整支持
-
-## 🔧 开发指南
-
-### 添加新市场
-1. 在 `backend/app/engines/` 创建新引擎
-2. 在 `backend/app/routers/` 添加 API 路由
-3. 在 `frontend/src/pages/` 创建页面组件
-4. 在 `frontend/src/routes.ts` 注册路由
-5. 在 `frontend/src/App.tsx` 添加导航项
-
-### 运行测试
-```bash
-# 后端测试
-python -m pytest backend/tests/ -v
-
-# 前端测试
-cd frontend && npm test
-```
-
-## 📄 许可证
-
-MIT License
+本项目采用 **Apache License 2.0**，详见 [LICENSE](LICENSE)。
