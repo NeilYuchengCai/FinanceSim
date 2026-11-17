@@ -73,7 +73,7 @@ async def get_returns(
 
 @router.get("/portfolio")
 async def get_portfolio_analytics(
-    world_id: int,
+    world_id: int = 1,
     world: World = Depends(get_world_or_404),
     session: AsyncSession = Depends(get_session),
 ):

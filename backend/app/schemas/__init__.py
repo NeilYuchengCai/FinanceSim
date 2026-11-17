@@ -3,7 +3,7 @@ FinanceSim Pydantic Schemas
 """
 from typing import Optional, List, Dict, Any
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 # ========== World Schemas ==========
@@ -37,8 +37,7 @@ class WorldResponse(BaseModel):
     simulation_speed: float = 1.0
     difficulty: str = "normal"
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class WorldUpdate(BaseModel):
@@ -87,8 +86,7 @@ class AssetResponse(BaseModel):
     # 最近一根 K 线的成交量
     last_volume: Optional[float] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PriceBar(BaseModel):
@@ -126,8 +124,7 @@ class OrderResponse(BaseModel):
     created_by: str
     created_at: datetime
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class TradeResponse(BaseModel):
@@ -141,8 +138,7 @@ class TradeResponse(BaseModel):
     order_id_buy: Optional[str]
     order_id_sell: Optional[str]
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ========== Portfolio Schemas ==========
@@ -155,8 +151,7 @@ class PositionResponse(BaseModel):
     unrealized_pnl: float
     pnl_percent: float
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PortfolioResponse(BaseModel):
@@ -166,8 +161,7 @@ class PortfolioResponse(BaseModel):
     total_pnl: float
     total_pnl_percent: float
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ========== Simulation Schemas ==========
@@ -202,8 +196,7 @@ class NewsResponse(BaseModel):
     # 数据来源标注：新闻为模拟引擎生成（与 /news 口径一致）
     data_source: str = "SIMULATED"
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ========== Analytics Schemas ==========

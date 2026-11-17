@@ -33,7 +33,7 @@ npm run dev
 docker-compose up
 ```
 
-访问 http://localhost:5173
+访问 http://localhost:5174
 
 ## 📊 功能特性
 

@@ -82,7 +82,7 @@ async def create_asset(
 
 @router.get("", response_model=List[AssetResponse])
 async def list_assets(
-    world_id: int,
+    world_id: int = 1,
     asset_type: Optional[str] = Query(None, alias="asset_type"),
     # 兼容前端早期写法 ?type=EQUITY：缺这个别名时 type 过滤会被静默忽略，
     # 股票页会把债券/外汇/ETF 一起渲染出来。

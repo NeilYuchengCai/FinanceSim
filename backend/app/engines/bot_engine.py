@@ -146,8 +146,12 @@ class BotEngine:
                     created_by=f"BOT:{bot.config.name}"
                 )
                 trades.append(trade)
-                bot.cash -= decision["quantity"] * current_price
-                bot.positions[ticker] = bot.positions.get(ticker, 0) + decision["quantity"]
+                # 用真实成交价（含价差/冲击）与佣金记账，AI 交易员同样支付真实成本
+                fill_qty = trade.get("filled_quantity") or decision["quantity"]
+                fill_px = trade.get("avg_fill_price") or current_price
+                comm = trade.get("commission") or 0.0
+                bot.cash -= fill_qty * fill_px + comm
+                bot.positions[ticker] = bot.positions.get(ticker, 0) + fill_qty
                 executed = True
 
             elif decision["action"] == "SELL":
@@ -162,8 +166,11 @@ class BotEngine:
                         created_by=f"BOT:{bot.config.name}"
                     )
                     trades.append(trade)
-                    bot.cash += quantity * current_price
-                    bot.positions[ticker] -= quantity
+                    fill_qty = trade.get("filled_quantity") or quantity
+                    fill_px = trade.get("avg_fill_price") or current_price
+                    comm = trade.get("commission") or 0.0
+                    bot.cash += fill_qty * fill_px - comm
+                    bot.positions[ticker] -= fill_qty
                     if bot.positions[ticker] <= 0:
                         del bot.positions[ticker]
                     executed = True

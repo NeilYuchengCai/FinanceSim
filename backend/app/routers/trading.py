@@ -18,6 +18,7 @@ from app.models import Order, Trade, Position, Asset, World, UserEconomy
 from app.schemas import OrderCreate, OrderResponse, TradeResponse
 from app.engines.trading_engine import TradingEngine
 from app.engines.portfolio_engine import PortfolioEngine
+from app.engines.trading_engine import COMMISSION_RATE, MIN_COMMISSION
 from app.services.trading_calendar import is_open_for
 from app.services import market_stream
 
@@ -200,13 +201,17 @@ async def submit_order(
     portfolio = await get_portfolio_engine(world_id, session)
 
     # 预检：资金 / 持仓是否足够，避免成交后才发现无法入账造成状态不一致
+    # 资金预检额外计入预估佣金（费率 + 最低下限），避免成交后现金被佣金透支
     est_price = order_data.price if order_data.price is not None else _mid_price(order_data.asset_ticker)
     if side == "BUY" and est_price:
-        need = Decimal(str(est_price)) * Decimal(str(order_data.quantity))
+        est_qty = Decimal(str(order_data.quantity))
+        cost = Decimal(str(est_price)) * est_qty
+        est_commission = max(MIN_COMMISSION, cost * Decimal(str(COMMISSION_RATE)))
+        need = cost + est_commission
         if need > portfolio.cash + Decimal("1e-6"):
             raise HTTPException(
                 status_code=400,
-                detail=f"资金不足：约需 {need:.2f}，可用 {portfolio.cash:.2f}",
+                detail=f"资金不足：约需 {need:.2f}（含预估佣金 {est_commission:.2f}），可用 {portfolio.cash:.2f}",
             )
     if side == "SELL":
         pos = portfolio.get_position(order_data.asset_ticker)
@@ -218,10 +223,13 @@ async def submit_order(
             )
 
     # 严格停盘（Option A）：休市时市价单不可提交，但限价/止盈止损单允许挂单等待开市。
-    if order_data.type == "MARKET" and not is_open_for(asset.type, market_stream.get_sim_clock_time()):
+    # 按资产自身交易所日历判定（多交易所错峰停盘）。
+    if order_data.type == "MARKET" and not is_open_for(
+        asset.type, market_stream.get_sim_clock_time(), asset.exchange
+    ):
         raise HTTPException(
             status_code=400,
-            detail=f"市场休市（{asset.type}），市价单不可提交；限价单可挂单等待开市。",
+            detail=f"市场休市（{asset.type}/{asset.exchange or '默认'}），市价单不可提交；限价单可挂单等待开市。",
         )
 
     engine = get_trading_engine(world_id)
@@ -263,6 +271,14 @@ async def submit_order(
                     portfolio.sell(tk, info["qty"], avg)
         except ValueError as pe:
             raise HTTPException(status_code=400, detail=f"组合更新失败：{pe}")
+
+    # 扣除佣金（真实交易成本）：金额 Decimal 精确结算
+    commission = result.get("commission")
+    if commission:
+        try:
+            portfolio.charge_fee(Decimal(str(commission)))
+        except Exception as ce:
+            logger.warning(f"Failed to charge commission for world {world_id}: {ce}")
 
     # 落库（订单/成交/持仓/现金）：失败只记录，不影响已完成的成交响应
     try:
@@ -449,7 +465,7 @@ async def list_trades(
 
 @router.get("/portfolio")
 async def get_portfolio(
-    world_id: int,
+    world_id: int = 1,
     world: World = Depends(get_world_or_404),
     session: AsyncSession = Depends(get_session),
 ):
@@ -460,7 +476,7 @@ async def get_portfolio(
 
 @router.get("/portfolio/positions")
 async def get_positions(
-    world_id: int,
+    world_id: int = 1,
     world: World = Depends(get_world_or_404),
     session: AsyncSession = Depends(get_session),
 ):

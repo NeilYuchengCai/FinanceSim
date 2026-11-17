@@ -3,7 +3,7 @@ FinanceSim 配置管理
 """
 import os
 from functools import lru_cache
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -60,9 +60,10 @@ class Settings(BaseSettings):
     DEFAULT_STARTING_CAPITAL: float = 100000.0
     DEFAULT_SIMULATION_SPEED: float = 1.0
     
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+    )
 
 
 @lru_cache()

@@ -15,11 +15,7 @@ from app.models import Event, News, Asset, World
 from app.schemas import EventCreate, NewsResponse
 from app.engines.event_engine import EventGenerator, EventPropagation, Event as SimEvent
 from app.core.datasource import DataSource
-from app.services.market_stream import (
-    get_market_stream,
-    SECONDS_PER_YEAR,
-    TICK_VOL_SCALE,
-)
+from app.services.market_stream import get_market_stream
 
 logger = logging.getLogger(__name__)
 
@@ -29,80 +25,77 @@ router = APIRouter(prefix="/events", tags=["events"])
 _event_generator = None
 _event_propagation = None
 
-# ---------------------------------------------------------------- 价格冲击参数
-# 单次事件冲击占价格比例的上限：封顶 ±5%，防止黑天鹅一戳到底
-MAX_EVENT_SHOCK_PCT = 0.05
-# propagate 输出的 impact（severity*sentiment 量级 ±1）到价格冲击的基础换算系数
-IMPACT_TO_PRICE = 0.12
-# 波动率差异化：以年化 25% 的普通股票为基准 1.0，缩放范围 [0.5, 2.0]
-# 注意：此处与 market_stream 的 state.sigma 采用同一"每模拟秒年化折算"口径，
-# 因此 vol_ratio = 资产波动率 / 0.25，与倍速无关、跨速度一致。
-_REFERENCE_SIGMA = (
-    0.25 / math.sqrt(SECONDS_PER_YEAR) * TICK_VOL_SCALE
-)
-VOL_SCALE_RANGE = (0.5, 2.0)
-# 事件类型差异化：危机类冲击最大，宏观类居中，公司类最温和
-EVENT_TYPE_SHOCK_SCALE = {
-    "liquidity_crisis": 1.5,
-    "banking_crisis": 1.5,
-    "black_swan": 1.5,
-    "geopolitical": 1.0,
-    "central_bank": 1.0,
-    "inflation_shock": 1.0,
-    "employment_shock": 1.0,
-}
-DEFAULT_TYPE_SHOCK_SCALE = 0.7  # COMPANY 类事件
+# ---------------------------------------------------------------- 相关冲击参数
+# 事件冲击改为"因子式相关传导"：所有受影响资产共享一个市场情绪标量 M
+# （M = event.sentiment_effect，已含 severity 缩放，量级约 ±0.8），再按
+#   价格冲击% = M·β·W_MARKET   （市场因子：全市场同向，高 beta 资产动得更猛）
+#            + M·W_SECTOR       （行业因子：同行业额外同向）
+#            + M·W_IDIO         （特异因子：直接标的额外冲击）
+# 这样同板块/同 beta 的资产天然联动（真实市场相关性），而非各自独立 ±5%。
+# 单资产单事件封顶 ±MAX_EVENT_SHOCK_PCT，防黑天鹅一戳到底。
+MAX_EVENT_SHOCK_PCT = 0.10
+MARKET_FACTOR_W = 0.06
+SECTOR_FACTOR_W = 0.03
+IDIO_FACTOR_W = 0.02
+
+# 模块级临时表：记录每个 ticker 在本次传播中的层级，避免污染 shocks 字典
+_level_map: Dict[str, str] = {}
 
 
 def apply_event_price_shocks(event: SimEvent, assets: List[Dict]) -> List[Dict]:
-    """把事件传播影响封顶后按资产波动率/事件类型差异化施加到行情。
+    """把事件影响以因子模型施加到行情，产生跨资产相关联动。
 
-    返回实际施加的明细 [{ticker, level, sector, raw_impact, applied_pct}]，
-    供日志核对；传播引擎或行情流不可用时返回空列表。
+    返回实际施加的明细 [{ticker, level, applied_pct}]，供日志核对；
+    传播引擎或行情流不可用时返回空列表。
     """
-    if _event_propagation is None:
+    if _event_propagation is None or not assets:
         return []
     stream = get_market_stream()
     if stream is None:
         return []
 
-    impacts = _event_propagation.propagate(event, assets)
-    type_scale = EVENT_TYPE_SHOCK_SCALE.get(event.type, DEFAULT_TYPE_SHOCK_SCALE)
+    # 市场情绪标量（已含 severity 缩放），为 0 则无冲击
+    M = float(event.sentiment_effect or 0.0)
+    if M == 0.0:
+        return []
+
+    _level_map.clear()
+    affected_set = set(event.affected_assets or [])
+    sectors_set = set(event.affected_sectors or [])
+    asset_sector = {a.get("ticker"): (a.get("sector") or "Unknown") for a in assets}
+
+    shocks: Dict[str, float] = {}
+    for ticker, sec in asset_sector.items():
+        if not ticker or ticker not in stream._assets:
+            continue
+        st = stream._assets[ticker]
+        beta = float(st.beta) if st.beta else 1.0
+        pct = M * MARKET_FACTOR_W * beta
+        level = "market"
+        if sec in sectors_set:
+            pct += M * SECTOR_FACTOR_W
+            level = "sector"
+        if ticker in affected_set:
+            pct += M * IDIO_FACTOR_W
+            level = "direct"
+        pct = max(-MAX_EVENT_SHOCK_PCT, min(MAX_EVENT_SHOCK_PCT, pct))
+        if pct != 0.0:
+            shocks[ticker] = pct
+            _level_map[ticker] = level
 
     applied: List[Dict] = []
-    for imp in impacts:
-        ticker = imp.get("ticker")
-        if not ticker or ticker == "MACRO":
-            continue  # 宏观影响不直接映射到单个行情标的
-        raw = float(imp.get("impact") or 0.0)
-        if raw == 0.0:
-            continue
-        state = stream._assets.get(ticker)
-        if state is None:
-            continue
-
-        # 1) 基础换算并封顶 ±5%
-        base = max(-MAX_EVENT_SHOCK_PCT, min(MAX_EVENT_SHOCK_PCT, raw * IMPACT_TO_PRICE))
-        # 2) 按资产波动率差异化：高波动资产对同一事件反应更大
-        vol_ratio = state.sigma / _REFERENCE_SIGMA if _REFERENCE_SIGMA > 0 else 1.0
-        vol_scale = max(VOL_SCALE_RANGE[0], min(VOL_SCALE_RANGE[1], vol_ratio))
-        # 3) 按事件类型差异化，并再次封顶，保证任何组合都不超过 ±5%
-        pct = max(-MAX_EVENT_SHOCK_PCT,
-                  min(MAX_EVENT_SHOCK_PCT, base * vol_scale * type_scale))
-        if pct == 0.0:
-            continue
-        stream.apply_shock(ticker, pct)
-        applied.append({
-            "ticker": ticker,
-            "level": imp.get("level"),
-            "sector": imp.get("sector"),
-            "raw_impact": round(raw, 6),
-            "applied_pct": round(pct, 6),
-        })
+    if shocks:
+        stream.apply_shocks(shocks)
+        for t, p in shocks.items():
+            applied.append({
+                "ticker": t,
+                "level": _level_map.get(t, "market"),
+                "applied_pct": round(p, 6),
+            })
 
     logger.info(
-        "Event '%s' (type=%s severity=%.2f) price shocks applied to %d assets",
-        event.title, event.type, event.severity, len(applied),
+        "Event '%s' (type=%s severity=%.2f) correlated shocks applied to %d assets (M=%.3f)",
+        event.title, event.type, event.severity, len(applied), M,
     )
     return applied
 

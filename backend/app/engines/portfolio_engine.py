@@ -174,6 +174,12 @@ class PortfolioEngine:
             if ticker in self.positions:
                 price_dec = Decimal(str(price)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
                 self.positions[ticker].update_price(price_dec)
+
+    def charge_fee(self, fee: Decimal) -> None:
+        """扣除交易费用（佣金/印花税等），金额以 Decimal 精确结算（铁律②）。"""
+        fee_dec = Decimal(str(fee)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        # 现金不足时不透支为负：费用优先从现金扣，最低为 0
+        self.cash = max(Decimal("0"), self.cash - fee_dec)
     
     def get_position(self, ticker: str) -> Optional[Dict]:
         """获取持仓详情（金额字段一律以 Decimal 精确返回，铁律②）"""

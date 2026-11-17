@@ -19,6 +19,7 @@ from app.dependencies import get_world_or_404
 from app.models import World
 from app.engines.simulation_engine import SimulationClock, SimulationSpeed
 from app.services.market_stream import get_market_stream, set_sim_clock_provider
+from app.services.trading_calendar import next_trading_open
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,10 @@ async def get_sim_clock(world_id: int, session: AsyncSession) -> SimulationClock
         # 模拟起点对齐到种子行情的最后一天，使新生成的日K严格排在种子数据之后，
         # Analytics 等依赖 price_history 的页面才能跟随模拟时间延伸到"当天"。
         start_time = await _seed_last_date(session, world_id) or datetime.now()
+        # 让每个世界的模拟时钟起点对齐到下一个交易时段开盘(09:30)，
+        # 使"启动即处于可交易状态"，首用体验不再被 400「市场休市」劝退；
+        # 仅修正初始状态，不改变"不自动跑时钟"的既有设计（铁律：不自动推进）。
+        start_time = next_trading_open(start_time)
         sim_clocks[world_id] = SimulationClock(current_day=restored_day, start_time=start_time)
 
     # 把"模拟是否暂停"接入行情流：暂停时实时价格冻结（只发心跳，不推进行情）。

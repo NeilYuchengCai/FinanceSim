@@ -26,6 +26,8 @@ export default defineConfig({
         }
       }
     },
-    chunkSizeWarningLimit: 300,
+    // 图表库(recharts/lightweight-charts)本身体积大，单独成 chunk 已是最优拆分；
+    // 阈值上调到与真实产物匹配，避免误导性的构建告警。
+    chunkSizeWarningLimit: 700,
   }
 })

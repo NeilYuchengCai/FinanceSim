@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FinanceSim 使用指南 · 从零上手到精通</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --bg-soft: #161b22;
+    --bg-card: #1c2230;
+    --border: #2a3344;
+    --text: #e6edf3;
+    --text-dim: #9aa7b5;
+    --accent: #58a6ff;
+    --accent-2: #3fb950;
+    --accent-3: #d29922;
+    --danger: #f85149;
+    --code-bg: #0b0f15;
+    --sidebar-w: 260px;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    font-size: 15px;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  .layout { display: flex; align-items: flex-start; }
+
+  /* Sidebar */
+  .sidebar {
+    width: var(--sidebar-w);
+    flex: 0 0 var(--sidebar-w);
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    background: var(--bg-soft);
+    border-right: 1px solid var(--border);
+    padding: 22px 16px;
+  }
+  .sidebar h2 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    margin: 18px 0 8px;
+  }
+  .sidebar .brand {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 4px;
+  }
+  .sidebar .brand small { display:block; font-size: 11px; color: var(--text-dim); font-weight: 400; letter-spacing: 0; }
+  .sidebar nav a {
+    display: block;
+    padding: 6px 10px;
+    border-radius: 6px;
+    color: var(--text-dim);
+    font-size: 14px;
+    border-left: 2px solid transparent;
+  }
+  .sidebar nav a:hover { background: var(--bg-card); color: var(--text); text-decoration: none; }
+  .sidebar nav a.active { color: var(--accent); border-left-color: var(--accent); background: var(--bg-card); }
+
+  /* Content */
+  .content { flex: 1; min-width: 0; padding: 40px 56px 120px; max-width: 980px; }
+  .content h1 { font-size: 30px; margin: 0 0 6px; }
+  .content h2 {
+    font-size: 23px;
+    margin: 46px 0 14px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+    scroll-margin-top: 20px;
+  }
+  .content h3 { font-size: 18px; margin: 28px 0 10px; color: var(--text); scroll-margin-top: 20px; }
+  .content p { margin: 10px 0; color: var(--text); }
+  .content ul, .content ol { padding-left: 22px; }
+  .content li { margin: 5px 0; }
+  .lead { color: var(--text-dim); font-size: 16px; margin-bottom: 30px; }
+
+  code {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 1px 6px;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 13px;
+    color: #c9d1d9;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    font-size: 13px;
+    line-height: 1.55;
+  }
+  pre code { background: none; border: none; padding: 0; color: #c9d1d9; }
+
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin: 16px 0;
+  }
+  .callout {
+    border-left: 4px solid var(--accent);
+    background: var(--bg-card);
+    border-radius: 8px;
+    padding: 12px 18px;
+    margin: 16px 0;
+  }
+  .callout.tip { border-left-color: var(--accent-2); }
+  .callout.warn { border-left-color: var(--accent-3); }
+  .callout.danger { border-left-color: var(--danger); }
+  .callout b { color: var(--text); }
+
+  table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 14px; }
+  th, td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; vertical-align: top; }
+  th { background: var(--bg-soft); color: var(--text); }
+  tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
+
+  .badge {
+    display: inline-block;
+    font-size: 12px;
+    padding: 1px 8px;
+    border-radius: 10px;
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    margin-right: 4px;
+  }
+  .badge.live { color: var(--accent-2); border-color: var(--accent-2); }
+  .badge.sim { color: var(--text-dim); }
+  .badge.fb { color: var(--accent-3); border-color: var(--accent-3); }
+
+  .steps { counter-reset: step; list-style: none; padding-left: 0; }
+  .steps > li {
+    position: relative;
+    padding: 10px 0 10px 44px;
+    border-left: 2px solid var(--border);
+    margin-left: 14px;
+  }
+  .steps > li::before {
+    counter-increment: step;
+    content: counter(step);
+    position: absolute;
+    left: -16px; top: 8px;
+    width: 28px; height: 28px;
+    background: var(--accent);
+    color: #04101f;
+    border-radius: 50%;
+    text-align: center;
+    line-height: 28px;
+    font-weight: 700;
+  }
+  .topbar {
+    position: sticky; top: 0; z-index: 5;
+    background: rgba(13,17,23,0.85);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 56px;
+    font-size: 13px; color: var(--text-dim);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .kbd { font-family: monospace; background: var(--bg-soft); border:1px solid var(--border); border-bottom-width:2px; border-radius:4px; padding:0 5px; font-size:12px; }
+  .footer { color: var(--text-dim); font-size: 13px; border-top: 1px solid var(--border); margin-top: 60px; padding-top: 20px; }
+
+  @media (max-width: 900px) {
+    .sidebar { display: none; }
+    .content { padding: 24px 18px 80px; }
+    .topbar { padding: 10px 18px; }
+  }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <span>📈 FinanceSim 使用指南</span>
+  <span>本地金融市场模拟平台 · 离线优先 · 真实数据可开</span>
+</div>
+
+<div class="layout">
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="sidebar">
+    <div class="brand">FinanceSim<small>金融市场模拟平台 · 使用指南</small></div>
+    <nav id="toc">
+      <h2>目录</h2>
+      <a href="#intro">1. 这是什么</a>
+      <a href="#quickstart">2. 三分钟跑起来</a>
+      <a href="#realdata">3. 开启真实数据</a>
+      <a href="#concepts">4. 先搞懂 4 个概念</a>
+      <a href="#play">5. 怎么玩：完整流程</a>
+      <a href="#pages">6. 页面功能速览</a>
+      <a href="#trading">7. 交易玩法详解</a>
+      <a href="#data-label">8. 数据真实性说明</a>
+      <a href="#faq">9. 常见问题与排错</a>
+      <a href="#tips">10. 实用技巧</a>
+    </nav>
+  </aside>
+
+  <!-- ============ CONTENT ============ -->
+  <main class="content">
+    <h1>FinanceSim 使用指南</h1>
+    <p class="lead">一个从真实金融市场状态启动、能在本地独立运行、随模拟时间向未来自主演化的多市场金融世界。本指南带你从“装好能打开”到“懂得怎么玩、怎么玩出意思”。</p>
+
+    <!-- 1 -->
+    <h2 id="intro">1. 这是什么</h2>
+    <p>FinanceSim 不是行情软件，而是一个<strong>“活的金融世界”</strong>：它以真实世界的股票 / 外汇 / 债券 / 指数 / 商品为初始资产，在本地用确定性随机引擎推演未来——价格随机游走、新闻不断生成、宏观缓慢演化、突发事件冲击市场、AI 交易员自动买卖。</p>
+    <div class="card">
+      <p style="margin-top:0"><b>它能在本地做什么：</b></p>
+      <ul style="margin-bottom:0">
+        <li><b>620+ 真实资产</b>：股票约 455、债券 48、ETF 40、外汇 52、指数 25、商品若干（含原油 / 黄金 / 铜等）。</li>
+        <li><b>12+ 核心引擎</b>：市场、模拟时钟、撮合、交易、组合、风控、分析、事件、新闻、宏观、债券、外汇、AI 交易员、商品。</li>
+        <li><b>实时行情流</b>：WebSocket 每秒推送一次全市场报价，前端即时刷新。</li>
+        <li><b>可真实交易</b>：市价单 / 限价单，成交写库、组合同步、可跨重启保留。</li>
+        <li><b>真实数据可开</b>：联网后接入 CNBC 行情、ECB 外汇、FRED 宏观、RSS 新闻，<b>全部免 key</b>；断网自动回退合成数据。</li>
+      </ul>
+    </div>
+    <div class="callout tip">
+      <b>一句话定位：</b>把它当成你私人的、可随意快进 / 重来的“金融沙盒”——既能练交易、做压力测试，也能看一个虚拟世界经济如何随新闻与宏观起伏。
+    </div>
+
+    <!-- 2 -->
+    <h2 id="quickstart">2. 三分钟跑起来</h2>
+    <p>有两种方式。<b>只想玩 → 走 Docker</b>；<b>想改代码 / 看日志 → 走源码开发模式</b>。</p>
+
+    <h3>方式 A：源码开发模式（前后端分离）</h3>
+    <p>后端默认端口 <code>8000</code>，前端开发服务器（Vite）端口 <code>5174</code>，前端会自动把 <code>/api</code> 请求和 WebSocket 代理到后端。</p>
+    <pre><code># 1) 启动后端（FastAPI + uvicorn）
+cd FinSim/backend
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+# 2) 另开一个终端启动前端
+cd FinSim/frontend
+npm install        # 首次需要
+npm run dev        # 默认 http://localhost:5174</code></pre>
+    <div class="callout warn">
+      <b>环境提示：</b>若系统 <code>PATH</code> 里没有 <code>python</code> / <code>npm</code>，用本机托管运行时的完整路径，例如
+      <code>C:/Users/Administrator/.workbuddy/binaries/python/versions/3.13.12/python.exe</code> 与对应的 <code>node.exe</code>。详见第 9 节排错。
+    </div>
+
+    <h3>方式 B：Docker 一键部署（推荐给只想玩的人）</h3>
+    <p>镜像内已把前端静态产物挂到后端，<b>一个容器、一个端口</b>：浏览器直接开 <code>http://localhost:8000/</code> 就是完整 SPA。</p>
+    <pre><code>cd FinSim
+docker build -t finsim .
+docker run -p 8000:8000 finsim
+# 浏览器访问 http://localhost:8000/</code></pre>
+    <p>想带真实数据，启动时把后端 <code>.env</code> 挂进去（见第 3 节），或在 <code>docker run</code> 加 <code>-e USE_EXTERNAL_DATA=True</code>。</p>
+
+    <h3>确认跑起来了</h3>
+    <pre><code>curl http://localhost:8000/health
+# 返回 {"status":"healthy"} 即正常</code></pre>
+
+    <!-- 3 -->
+    <h2 id="realdata">3. 开启真实数据（可选但强烈推荐）</h2>
+    <p>默认是 <b>离线优先</b>：所有数据用合成（SIMULATED）填充，断网也能玩。想要真实行情 / 宏观 / 新闻，只需打开一个开关。</p>
+    <h3>步骤</h3>
+    <ol>
+      <li>在 <code>FinSim/backend/</code> 下创建（或编辑）<code>.env</code> 文件（该文件已被 gitignore，不会进版本库）。</li>
+      <li>写入以下内容：</li>
+    </ol>
+    <pre><code># backend/.env
+USE_EXTERNAL_DATA=True
+# 三个 key 留空即走免 key 公开源（CNBC / Frankfurter / FRED / RSS）
+ALPHA_VANTAGE_API_KEY=
+FRED_API_KEY=
+NEWS_API_KEY=</code></pre>
+    <ol start="3">
+      <li>重启后端。启动日志里会出现 “Headlines refreshed from external provider” 与宏观播种成功的提示。</li>
+    </ol>
+    <div class="card">
+      <p style="margin-top:0"><b>三个真实数据源（全部免 key）：</b></p>
+      <table>
+        <tr><th>数据类型</th><th>真实来源</th><th>标注</th></tr>
+        <tr><td>股票 / ETF / 指数行情</td><td>CNBC 公开行情接口</td><td><span class="badge live">LIVE</span></td></tr>
+        <tr><td>外汇（ECB 主要货币对）</td><td>Frankfurter（欧洲央行）</td><td><span class="badge live">LIVE</span></td></tr>
+        <tr><td>宏观经济（利率 / 通胀 / 失业）</td><td>FRED（美联储圣路易斯）</td><td><span class="badge live">LIVE</span></td></tr>
+        <tr><td>新闻头条</td><td>公开 RSS（WSJ / MarketWatch / CNBC）</td><td><span class="badge live">LIVE</span></td></tr>
+      </table>
+    </div>
+    <div class="callout tip">
+      <b>为什么免 key 也能真？</b> 这些源是面向公众免费、无需令牌的公开接口（数据中心 IP 被个别源拦截时，代码会自动回退到合成数据，绝不会报错卡死）。
+    </div>
+
+    <!-- 4 -->
+    <h2 id="concepts">4. 先搞懂 4 个概念</h2>
+    <div class="card">
+      <p style="margin-top:0"><b>① 世界（World）</b>：一次模拟的独立沙盒，有自己的人口、资产、宏观与随机种子。默认世界 id=1。多世界互不干扰。</p>
+      <p><b>② 模拟时钟与倍速</b>：时间是“模拟时间”，可快进。</p>
+      <ul>
+        <li><code>X1</code> = 1 模拟秒 / 真实秒（实时地板，最慢也等于真时间流速）。</li>
+        <li><code>X10 / X100 / X1000</code> 线性加速。默认 <code>X100</code>。</li>
+        <li><b>关键设计</b>：行情波动与倍速解耦——波动按“真实流逝的模拟秒数”缩放，所以快进 1000 倍 ≠ 失真 1000 倍，而是等价于让这个世界真实走过同样多的模拟时间。<span class="badge">全真模拟</span></li>
+      </ul>
+      <p><b>③ 资产（Asset）</b>：股票 / 债券 / ETF / 外汇 / 指数 / 商品。每只都有板块、基本面、波动率、当前价。</p>
+      <p style="margin-bottom:0"><b>④ 数据来源标注</b>：界面里每条数据都会标明它是 <span class="badge live">LIVE/REAL</span>、<span class="badge sim">SIMULATED</span> 还是 <span class="badge fb">FALLBACK</span>。这是平台的铁律之一——绝不用合成数据冒充真实功能。</p>
+    </div>
+
+    <!-- 5 -->
+    <h2 id="play">5. 怎么玩：完整流程</h2>
+    <p>跟着下面 8 步走一遍，你就真正“上手”了。</p>
+    <ol class="steps">
+      <li><b>看总览</b>：打开 <code>Overview</code>，看世界整体健康度、主要指数、今日要闻、组合快照。这是你的“驾驶舱”。</li>
+      <li><b>挑资产</b>：进 <code>Markets</code> 或用顶部搜索 <code>Search</code> 找一只股票 / 外汇 / 债券 / 商品，点进 <code>资产详情</code> 能看到 K 线、基本面、相关新闻。</li>
+      <li><b>下第一单</b>：进 <code>Orders</code> 选资产、填数量、选市价 / 限价，下单。成交后去 <code>Portfolio</code> 看持仓与盈亏。</li>
+      <li><b>让世界转起来</b>：进 <code>Simulation</code>，点 <b>Start</b>，再调倍速（建议先 X100 感受，再 X1000 快进）。肉眼可见报价每秒跳动、K 线延伸。</li>
+      <li><b>读新闻与事件</b>：<code>News</code> 里真实头条带来源徽标；<code>Timeline</code> 记录模拟过程中发生的突发事件及其价格冲击。</li>
+      <li><b>看 AI 对手盘</b>：<code>Bots</code> 里预置了动量 / 均值回归 / 做市 / 宏观四类 AI 交易员，它们会自动买卖、制造市场活动。你也可以加自己的 bot。</li>
+      <li><b>接挑战</b>：<code>Challenges</code> 给出带约束的目标（例如“30 天内把回撤控制在 5% 以内”），系统按真实组合自动评估。</li>
+      <li><b>做分析</b>：<code>Analytics</code> 看相关性 / 风险；<code>Economy</code> 看宏观周期；<code>Bonds</code> / <code>FX</code> / <code>Commodities</code> 看各自市场深度。</li>
+    </ol>
+    <div class="callout">
+      <b>新手上路建议：</b>先把倍速设 <code>X1</code> 慢看一会儿报价怎么动 → 下 1 手体验成交 → 再切 <code>X1000</code> 快进一周，观察新闻和事件如何改变价格。这种“慢看机制、快进结果”的对比，正是这个沙盒最好玩的地方。
+    </div>
+
+    <!-- 6 -->
+    <h2 id="pages">6. 页面功能速览</h2>
+    <p>前端共约 19 个页面，按用途分组：</p>
+    <table>
+      <tr><th>页面</th><th>干什么</th></tr>
+      <tr><td><code>Overview</code></td><td>驾驶舱：指数、要闻、组合、世界状态总览。</td></tr>
+      <tr><td><code>Markets</code></td><td>全市场行情列表，按资产类别筛选、排序、点进详情。</td></tr>
+      <tr><td><code>Equities</code> / <code>FX</code> / <code>Bonds</code> / <code>Commodities</code></td><td>股票 / 外汇 / 债券 / 商品各自的专属市场视图与深度。</td></tr>
+      <tr><td><code>AssetDetail</code>（资产详情）</td><td>单资产 K 线、基本面、相关新闻、直接下单入口。</td></tr>
+      <tr><td><code>Orders</code></td><td>下单（市价 / 限价）、查委托与成交记录。</td></tr>
+      <tr><td><code>Portfolio</code></td><td>持仓、现金、盈亏、净值曲线。</td></tr>
+      <tr><td><code>Simulation</code></td><td>模拟时钟控制：开始 / 暂停 / 倍速 / 步进 / 重置。</td></tr>
+      <tr><td><code>Timeline</code></td><td>模拟历史事件流（事件 + 价格冲击）时间线。</td></tr>
+      <tr><td><code>News</code></td><td>新闻流，真实头条标来源与 LIVE 徽标，合成新闻标 SIMULATED。</td></tr>
+      <tr><td><code>Bots</code></td><td>AI 交易员管理：查看策略、盈亏、增删 bot。</td></tr>
+      <tr><td><code>Challenges</code></td><td>挑战目标与自动评估进度。</td></tr>
+      <tr><td><code>Analytics</code></td><td>相关性、风险、组合分析图表。</td></tr>
+      <tr><td><code>Economy</code></td><td>宏观经济状态、周期相位、历史曲线。</td></tr>
+      <tr><td><code>Search</code></td><td>全局资产 / 新闻搜索。</td></tr>
+      <tr><td><code>Settings</code></td><td>偏好设置（语言、主题等）。</td></tr>
+      <tr><td><code>WorldCreator</code></td><td>创建 / 管理模拟世界（不同种子 = 不同平行宇宙）。</td></tr>
+      <tr><td><code>Settings / Snapshots</code></td><td>快照：保存 / 恢复某个模拟时点。</td></tr>
+    </table>
+
+    <!-- 7 -->
+    <h2 id="trading">7. 交易玩法详解</h2>
+    <h3>下单类型</h3>
+    <ul>
+      <li><b>市价单（Market）</b>：以当前实时报价立即成交。注意：若资产不在行情流中（例如刚新建的资产需等下一 tick 注入），会处于 PENDING，价格注入后即成交。</li>
+      <li><b>限价单（Limit）</b>：指定目标价，价格到达才成交；未达则挂单等待。</li>
+    </ul>
+    <h3>组合与风控</h3>
+    <ul>
+      <li>成交后现金、持仓、手续费实时结算，写入数据库，<b>重启不丢</b>。</li>
+      <li><code>Portfolio</code> 里能看到每只持仓的成本、现价、浮动盈亏；<code>Analytics</code> 看整体波动与回撤。</li>
+      <li>事件冲击对价格封顶 ±5%，避免单条新闻把市场打爆——这是刻意的全真约束。</li>
+    </ul>
+    <div class="callout tip">
+      <b>练手思路：</b>先用小资金市价单熟悉成交节奏；再用限价单在支撑位“挂钓鱼单”；最后开 <code>Challenges</code> 用真实组合去冲约束目标，比单纯看盘有目标感得多。
+    </div>
+
+    <!-- 8 -->
+    <h2 id="data-label">8. 数据真实性说明（很重要）</h2>
+    <p>平台有一条不可退化的铁律：<b>禁止用合成数据冒充真实功能</b>。所以界面上每条数据都会标注来源：</p>
+    <table>
+      <tr><th>标注</th><th>含义</th><th>例子</th></tr>
+      <tr><td><span class="badge live">LIVE / REAL</span></td><td>来自真实外部源（联网开启时）</td><td>CNBC 实时价、FRED 宏观、WSJ RSS 头条</td></tr>
+      <tr><td><span class="badge sim">SIMULATED</span></td><td>本平台按规则合成演化（非真实历史）</td><td>模拟步进生成的新闻、随机游走出的未来 K 线</td></tr>
+      <tr><td><span class="badge fb">FALLBACK</span></td><td>真实源不可用时回退的合成数据</td><td>断网时自动顶上的行情 / 新闻</td></tr>
+      <tr><td><span class="badge">HISTORICAL</span></td><td>历史回放数据</td><td>种子自带的历史价格序列</td></tr>
+    </table>
+    <div class="callout warn">
+      <b>怎么辨别你看到的是不是真的？</b> 开启 <code>USE_EXTERNAL_DATA=True</code> 后，<code>News</code> 页真实头条会显示来源（如 <code>WSJ.com: Markets</code>）和绿色 <b>LIVE</b> 徽标；<code>Economy</code> 的利率会接近真实 FRED 值（如 0.0388）。若只看到 <code>FINANCESIM</code> 来源与灰色 <b>SIMULATED</b> 徽标，说明当前是合成数据。
+    </div>
+
+    <!-- 9 -->
+    <h2 id="faq">9. 常见问题与排错</h2>
+    <h3>Q1：<code>python</code> / <code>npm</code> 命令找不到？</h3>
+    <p>本机托管运行时里 <code>PATH</code> 默认没有这两个命令。用完整路径即可：</p>
+    <pre><code># Python（示例路径，以你本机为准）
+C:/Users/Administrator/.workbuddy/binaries/python/versions/3.13.12/python.exe -m uvicorn app.main:app --port 8000
+# Node / npm 同理用对应 node.exe 与 npm-cli.js</code></pre>
+
+    <h3>Q2：前端白屏 / 接口 404？</h3>
+    <ul>
+      <li>开发模式：确认前端是 <code>5174</code>、后端是 <code>8000</code>，且 vite 代理正常（<code>/api</code> → <code>localhost:8000</code>，<code>ws:true</code>）。</li>
+      <li>Docker 模式：直接访问 <code>8000</code> 根路径即可，SPA 已由后端托管；不要再去开 5174。</li>
+    </ul>
+
+    <h3>Q3：开了真实数据但新闻还是 “FINANCESIM”？</h3>
+    <p>大概率是没重启后端，或当时网络不通触发了回退。重启后端、确认 <code>backend/.env</code> 的 <code>USE_EXTERNAL_DATA=True</code>，再看启动日志是否出现 “Headlines refreshed from external provider”。</p>
+
+    <h3>Q4：快进太快，来不及下单？</h3>
+    <p>这是早期版本的已知痛点，已修复：最低倍速 <code>X1</code> = 1 模拟秒 / 真实秒（实时地板），你可以先停在 <code>X1</code> 慢慢操作，需要时再上调到 X100 / X1000。</p>
+
+    <h3>Q5：数据会丢吗？重启后还在吗？</h3>
+    <p>交易、组合、现金、快照、事件、宏观历史都落 SQLite，<b>跨重启保留</b>。新建资产也会自动注入行情流，无需重启即可定价 / 交易。</p>
+
+    <h3>Q6：想完全离线玩？</h3>
+    <p>什么都不用配，默认就是离线优先。所有数据用合成填充，断网照常运行。</p>
+
+    <!-- 10 -->
+    <h2 id="tips">10. 实用技巧</h2>
+    <ul>
+      <li><b>慢看 + 快进组合</b>：X1 观察机制，X1000 看长期结果，对比最有意思。</li>
+      <li><b>多世界平行宇宙</b>：用 <code>WorldCreator</code> 开不同种子的世界，比较同一策略在不同“运气”下的表现。</li>
+      <li><b>快照回放</b>：在关键时点存 <code>Snapshots</code>，事后可恢复重来，做策略对比实验。</li>
+      <li><b>看 AI 怎么玩</b>：<code>Bots</code> 页观察四类策略的盈亏，能学到不少市场微观结构直觉。</li>
+      <li><b>事件冲击封顶 ±5%</b>：别指望一条新闻暴富或爆仓，这是全真约束，长期看均值回归更靠谱。</li>
+      <li><b>来源徽标是底线</b>：做任何判断前先瞄一眼数据是 LIVE 还是 SIMULATED，避免把“沙盒里的随机”当成“真实信号”。</li>
+    </ul>
+
+    <div class="footer">
+      FinanceSim · 本地金融市场模拟平台 · 离线优先 / 真实数据可开<br/>
+      本指南为离线自包含文档，无需联网即可阅读。
+    </div>
+  </main>
+</div>
+
+<script>
+  // 滚动高亮当前章节（离线可用，无外部依赖）
+  (function () {
+    var links = Array.prototype.slice.call(document.querySelectorAll('#toc a'));
+    var sections = links.map(function (a) { return document.querySelector(a.getAttribute('href')); });
+    function onScroll() {
+      var pos = window.scrollY + 120;
+      var current = 0;
+      for (var i = 0; i < sections.length; i++) {
+        if (sections[i] && sections[i].offsetTop <= pos) current = i;
+      }
+      links.forEach(function (l, i) { l.classList.toggle('active', i === current); });
+    }
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+  })();
+</script>
+</body>
+</html>

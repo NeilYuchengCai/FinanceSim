@@ -90,6 +90,19 @@ TICK_WHEN_MARKET_CLOSED = True
 # 休市期间的波动缩放：流动性低，波动收敛
 OFF_SESSION_VOL_SCALE = 0.35
 
+# ---------------- 价格过程拟真：跳变（肥尾）与波动率聚集 ----------------
+# 个股级 Poisson 跳变：全年约发生 JUMPS_PER_YEAR 次，每次跳幅为对数正态 N(0, JUMP_SIGMA)，
+# 制造真实市场的"肥尾"——绝大多数 tick 小幅游走，偶发跳空。概率随本 tick 模拟秒数线性缩放。
+JUMPS_PER_YEAR = 3.0
+JUMP_SIGMA = 0.04
+# 波动率聚集（vol clustering）：跳变/事件冲击后短期波动率抬升，随后缓慢衰减回常态，
+# 与真实市场"波动聚集"特征一致（GARCH 直觉）。
+JUMP_VOL_BOOST = 2.0        # 发生跳变时 vol_mult 瞬时乘子
+VOL_CLUSTER_DECAY = 0.03    # 每模拟秒 vol_mult 向 1.0 衰减的比例
+VOL_CAP_MULT = 6.0          # vol_mult 上限，防止极端累积
+# 行业因子联动强度：同一 sector 内资产额外共享一个同向因子，制造行业联动
+RHO_SECTOR = 0.25
+
 # 价格推进间隔（秒）与数据库批量回写间隔（秒）
 TICK_INTERVAL = 1.0
 PERSIST_INTERVAL = 30.0
@@ -129,12 +142,14 @@ class _AssetState:
 
     __slots__ = ("asset_id", "ticker", "price", "anchor", "prev_close",
                  "sigma", "decimals", "last_sent", "asset_type", "name", "sector",
-                 "prev_day_close", "data_source")
+                 "exchange", "prev_day_close", "data_source",
+                 "beta", "vol_mult", "cum_factor")
 
     def __init__(self, asset_id: int, ticker: str, price: float, anchor: float,
                  prev_close: float, sigma: float, decimals: int,
                  asset_type: str = "", name: str = "", sector: str = "",
-                 prev_day_close: float = 0.0):
+                 exchange: str = "", prev_day_close: float = 0.0,
+                 beta: float = 1.0):
         self.asset_id = asset_id
         self.ticker = ticker
         self.price = price
@@ -146,6 +161,12 @@ class _AssetState:
         self.asset_type = asset_type
         self.name = name or ticker
         self.sector = sector
+        self.exchange = exchange or ""
+        # 波动率聚集乘子：均值回复到 1.0；事件/大跳会瞬时抬升，随后缓慢衰减
+        self.vol_mult = 1.0
+        # 关联因子累积冲击：事件以"因子"形式一次性注入，advance 每 tick 逐步吸收
+        self.cum_factor = 0.0
+        self.beta = beta if beta is not None else 1.0
         # 上一个模拟交易日收盘（由 record_daily_bar 维护），用于计算"当日涨跌幅"
         self.prev_day_close = prev_day_close
         # 价格来源标记：默认 SIMULATED，外部行情接入后可标为 LIVE
@@ -226,6 +247,30 @@ class MarketStream:
             pass
         logger.info("Market stream started with %d instruments", len(self._assets))
 
+    async def reseed_live_prices(self) -> int:
+        """运行时手动触发一次外部真实价格重播种（设置页开启外部数据后调用）。
+
+        仅当 ``USE_EXTERNAL_DATA`` 为真且行情流已加载资产时生效；失败静默返回 0。
+        返回成功更新的资产数（0 表示未执行/失败）。
+        """
+        if not self._assets:
+            return 0
+        from app.config import settings
+
+        if not settings.USE_EXTERNAL_DATA:
+            return 0
+        try:
+            before = {t: st.price for t, st in self._assets.items()}
+            await self._maybe_seed_live_prices(self._assets)
+            updated = sum(
+                1 for t, st in self._assets.items() if st.price != before.get(t)
+            )
+            logger.info("Live price reseed applied to %d instruments", updated)
+            return updated
+        except Exception as exc:  # 绝不影响主流程
+            logger.warning("Live reseed failed: %s", exc)
+            return 0
+
     async def stop(self) -> None:
         if not self._running:
             return
@@ -289,6 +334,8 @@ class MarketStream:
                         Asset.volatility,
                         Asset.name,
                         Asset.sector,
+                        Asset.exchange,
+                        Asset.beta,
                     ).where(Asset.current_price.isnot(None), Asset.current_price > 0)
                 )
             ).all()
@@ -302,7 +349,7 @@ class MarketStream:
         last_closes = await self._load_last_closes([int(r[0]) for r in rows])
 
         states: Dict[str, _AssetState] = {}
-        for asset_id, ticker, asset_type, price, volatility, name, sector in rows:
+        for asset_id, ticker, asset_type, price, volatility, name, sector, exchange, beta in rows:
             price = float(price)
             asset_type = (asset_type or "").upper()
             vol = float(volatility) if volatility else 0.0
@@ -329,7 +376,9 @@ class MarketStream:
                 asset_type=asset_type,
                 name=name or ticker,
                 sector=sector or "",
+                exchange=exchange or "",
                 prev_day_close=last_closes.get(int(asset_id)) or 0.0,
+                beta=float(beta) if beta is not None else 1.0,
             )
 
         self._assets = states
@@ -414,7 +463,9 @@ class MarketStream:
             asset_type=asset_type,
             name=getattr(asset, "name", None) or ticker,
             sector=getattr(asset, "sector", None) or "",
+            exchange=getattr(asset, "exchange", None) or "",
             prev_day_close=0.0,
+            beta=float(getattr(asset, "beta", None) or 1.0),
         )
 
     async def _load_prev_closes(self, asset_ids: List[int]) -> Dict[int, float]:
@@ -488,18 +539,18 @@ class MarketStream:
         return out
 
     # ------------------------------------------------------------ 推进
-    def _is_open_for(self, asset_type: str) -> bool:
-        """某资产类型当前是否开市（严格停盘判定）。
+    def _is_open_for(self, asset_type: str, exchange: str = "") -> bool:
+        """某资产当前是否开市（严格停盘判定）。
 
         - trading_calendar 未就绪（导入失败）时，降级为"始终开市"，保持旧行为；
-        - 否则按资产类别 + 当前模拟时间判定（外汇/商品 7×24 仅周末休市，
-          股票类含 09:30~16:00 盘中判定）。
+        - 否则按资产类别 + 交易所 + 当前模拟时间判定（外汇/商品 7×24 仅周末休市，
+          股票类按各自交易所独立日历错峰开收）。
         任何异常都按"开市"处理，避免行情被长期冻结。
         """
-        if _is_trading_day is None or _is_open_for is None:
+        if _is_open_for is None:
             return True
         try:
-            return bool(_is_open_for(asset_type, get_sim_clock_time()))
+            return bool(_is_open_for(asset_type, get_sim_clock_time(), exchange or None))
         except Exception as exc:
             logger.warning("trading_calendar check failed (%s), falling back to open", exc)
             return True
@@ -507,37 +558,86 @@ class MarketStream:
     def advance(self) -> List[dict]:
         """推进一个 tick，返回本次**发生变化**的条目。
 
-        严格停盘：每个资产按其自身市场状态决定是否演进——
-        - 该资产对应市场休市 -> 冻结价格（不演进、不广播）；
-        - 债券(BOND)由 BondEngine 驱动，行情流跳过其 GBM；
-        - 开市的资产以满波动率(vol_scale=1.0)演进。
+        价格过程拟真（全真模拟核心）：
+        1. 跨资产相关性：引入**单市场因子 + 行业因子 + 特异因子**三因子模型。
+           每 tick 生成一个全市场共享的 market_z 与每个行业共享的 sector_z，
+           各资产收益 = β·market_z + β_s·sector_z + 特异_z。同一因子被所有相关
+           资产共享，从而全市场/同行业自然同向联动，且每个资产**边际波动率仍等于
+           其自身 sigma**（权重按 ρ 分解，方差守恒），不会因加因子而失真。
+        2. 跳变（肥尾）：个股按 Poisson 过程偶发跳空，跳幅对数正态。
+        3. 波动率聚集：每资产维护 vol_mult，事件/跳变后瞬时抬升并缓慢衰减回 1.0。
+        4. 严格停盘：每个资产按其自身交易所日历决定演进/冻结；债券由 BondEngine 驱动跳过。
+        5. 倍速守恒：所有扩散项按 √(模拟秒数) 缩放，均值回复按线性缩放，任意倍速下等价真实流逝。
         """
         if not self._assets:
             return []
 
-        # 本 tick 覆盖的模拟秒数（由倍速档位决定）。每模拟秒波动率为 state.sigma，
-        # 多秒累计的方差线性叠加，故标准差按 sqrt(模拟秒数) 缩放 —— GBM 严格正确。
-        # 均值回复是"单位时间的力"，按模拟秒数线性缩放，保证回复速率与倍速无关。
+        # 本 tick 覆盖的模拟秒数（由倍速档位决定）。方差线性叠加 => 标准差按 √(秒数) 缩放。
         sim_sec = self._sim_seconds_per_tick if self._sim_seconds_per_tick > 0 else 1.0
         sec_factor = math.sqrt(sim_sec)
 
+        # 共享因子：一个全市场 z，一个各行业 z（行业因子在同行业内制造额外联动）。
+        # 均为标准正态，缩放交由各资产自身的 σ 与权重完成，保证边际方差守恒。
+        market_z = self._rng.gauss(0.0, 1.0)
+        sector_z: Dict[str, float] = {}
+        # 个股级 Poisson 跳变概率（随模拟秒数线性缩放）
+        jump_prob = JUMPS_PER_YEAR * sim_sec / SECONDS_PER_YEAR
+
         items: List[dict] = []
         for state in self._assets.values():
-            # 严格停盘：该资产的市场休市时冻结价格
-            if not self._is_open_for(state.asset_type):
-                continue
+            # 严格停盘：该资产对应市场休市时——若允许休市续tick则降波动演进，否则冻结。
+            open_now = self._is_open_for(state.asset_type, state.exchange)
+            if not open_now:
+                if not TICK_WHEN_MARKET_CLOSED:
+                    continue
+                vol_scale = OFF_SESSION_VOL_SCALE
+            else:
+                vol_scale = 1.0
             # 债券由 BondEngine 权威驱动，行情流跳过其 GBM
             if state.asset_type == "BOND":
                 continue
-            # 开市时以满波动率演进
-            vol_scale = 1.0
-            # 几何布朗运动 + 极弱均值回复
-            sigma = state.sigma * sec_factor * vol_scale
-            pull = -MEAN_REVERSION * sim_sec * math.log(state.price / state.anchor)
-            move = pull + sigma * self._rng.gauss(0.0, 1.0) - 0.5 * sigma ** 2
-            move = max(-MAX_TICK_MOVE, min(MAX_TICK_MOVE, move))
 
-            new_price = max(state.price * math.exp(move), PRICE_FLOOR)
+            # 波动率聚集：vol_mult 向 1.0 缓慢衰减（事件/跳变会先抬升它）
+            if state.vol_mult > 1.0:
+                state.vol_mult += (1.0 - state.vol_mult) * VOL_CLUSTER_DECAY * sim_sec
+                if state.vol_mult < 1.0:
+                    state.vol_mult = 1.0
+            elif state.vol_mult < 1.0:
+                state.vol_mult = 1.0
+
+            # 三因子权重分解（方差守恒：w_m^2 + w_s^2 + w_i^2 = 1）
+            beta = state.beta if state.beta else 1.0
+            # 市场相关度 ρ_m 随 beta 增大（beta 越大越随大盘走）
+            rho_m = max(0.1, min(0.85, 0.15 + 0.25 * min(abs(beta), 2.0)))
+            w_m = math.sqrt(rho_m)
+            residual = math.sqrt(1.0 - rho_m)
+            # 行业因子仅在"该资产有 sector 且市场里存在同业"时生效；
+            # 这里恒定给一个小的行业联动权重，制造行业板块共振
+            rho_s = RHO_SECTOR
+            w_s = residual * math.sqrt(rho_s)
+            w_i = residual * math.sqrt(1.0 - rho_s)
+            sec = state.sector or "Unknown"
+            if sec not in sector_z:
+                sector_z[sec] = self._rng.gauss(0.0, 1.0)
+            z_s = sector_z[sec]
+            z_i = self._rng.gauss(0.0, 1.0)
+
+            sigma_i = state.sigma * state.vol_mult * vol_scale
+            pull = -MEAN_REVERSION * sim_sec * math.log(state.price / state.anchor)
+            diffusion = sigma_i * sec_factor * (w_m * market_z + w_s * z_s + w_i * z_i)
+            # 对数收益 = 均值回复力 + 扩散 - 0.5σ²（GBM 漂移修正）
+            log_ret = pull + diffusion - 0.5 * (sigma_i * sec_factor) ** 2
+
+            # 个股级 Poisson 跳变（肥尾）
+            if self._rng.random() < jump_prob:
+                jump = self._rng.gauss(0.0, JUMP_SIGMA)
+                log_ret += jump
+                # 跳变后波动率聚集抬升
+                state.vol_mult = min(VOL_CAP_MULT, state.vol_mult * JUMP_VOL_BOOST)
+
+            log_ret = max(-MAX_TICK_MOVE, min(MAX_TICK_MOVE, log_ret))
+
+            new_price = max(state.price * math.exp(log_ret), PRICE_FLOOR)
             rounded = round(new_price, state.decimals)
             state.price = new_price
 
@@ -680,12 +780,30 @@ class MarketStream:
         """对指定资产施加一次性价格冲击（事件影响），pct 为小数（如 -0.05 表示 -5%）。
 
         用于把"市场事件"真实反映到行情上，使时间线与价格走势紧密联动。
+        同时瞬时抬升该资产波动率乘子，触发**波动率聚集**（事件后短期波动放大、缓慢回落）。
         """
         state = self._assets.get(ticker)
         if state is None or not pct:
             return
         new_price = max(state.price * (1.0 + float(pct)), PRICE_FLOOR)
         state.price = new_price
+        boost = 1.0 + min(abs(pct), 0.1) * 8.0
+        state.vol_mult = min(VOL_CAP_MULT, state.vol_mult * boost)
+
+    def apply_shocks(self, shocks: Dict[str, float]) -> int:
+        """批量施加相关性冲击（事件引擎调用）。
+
+        参数 shocks: {ticker: pct}，pct 为小数。逐个调用 apply_shock。
+        返回实际命中并施加的资产数量。
+        """
+        applied = 0
+        for ticker, pct in shocks.items():
+            before = self._assets.get(ticker)
+            if before is None:
+                continue
+            self.apply_shock(ticker, pct)
+            applied += 1
+        return applied
 
     def _broadcast(self, payload: dict) -> None:
         for queue in list(self._subscribers):

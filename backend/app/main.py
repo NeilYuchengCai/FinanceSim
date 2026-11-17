@@ -13,6 +13,7 @@ from app.config import settings
 from app.core.datasource import DataSource
 from app.routers import worlds, assets, trading, simulation, analytics, events, search, economy, bonds, news as news_router, fx, bot, snapshots, challenges, commodities
 from app.routers import realtime as realtime_router
+from app.routers import settings as settings_router
 from app.engines import EconomicEngine, BondEngine, CentralBank, NewsEngine, FXEngine, BotEngine, EventGenerator, EventPropagation, CommodityEngine
 from app.services.market_stream import get_market_stream
 
@@ -263,6 +264,7 @@ app.include_router(news_router.router, prefix=settings.API_PREFIX)
 app.include_router(challenges.router, prefix=settings.API_PREFIX)
 app.include_router(commodities.router, prefix=settings.API_PREFIX)
 app.include_router(realtime_router.router, prefix=settings.API_PREFIX)
+app.include_router(settings_router.router, prefix=settings.API_PREFIX)
 
 
 @app.get("/")

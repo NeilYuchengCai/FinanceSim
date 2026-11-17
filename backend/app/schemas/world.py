@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from datetime import datetime
 from typing import Optional
 
@@ -20,5 +20,4 @@ class WorldResponse(BaseModel):
     simulation_speed: float = 1.0
     difficulty: str = "normal"
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
